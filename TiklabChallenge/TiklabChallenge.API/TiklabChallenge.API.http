@@ -1,0 +1,6 @@
+@TiklabChallenge.API_HostAddress = http://localhost:5216
+
+GET {{TiklabChallenge.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
