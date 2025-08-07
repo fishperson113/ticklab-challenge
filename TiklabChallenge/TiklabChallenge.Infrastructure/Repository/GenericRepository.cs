@@ -42,7 +42,15 @@ namespace TiklabChallenge.Infrastructure.Repository
         public async Task DeleteAsync(T entity)
         {
             _dbSet.Remove(entity);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException != null)
+            {
+                throw new InvalidOperationException(
+                    "Cannot delete the entity because it is referenced by other data (foreign key constraint violation).", ex);
+            }
         }
     }
 }
