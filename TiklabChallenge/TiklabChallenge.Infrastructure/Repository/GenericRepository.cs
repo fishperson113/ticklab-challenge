@@ -2,18 +2,20 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 using TiklabChallenge.Core.Interfaces;
+using TiklabChallenge.Infrastructure.Data;
 
 namespace TiklabChallenge.Infrastructure.Repository
 {
     public class GenericRepository<T> : IRepository<T> where T : class
     {
-        protected readonly DbContext _context;
+        protected readonly ApplicationContext _context;
         protected readonly DbSet<T> _dbSet;
 
-        public GenericRepository(DbContext context)
+        public GenericRepository(ApplicationContext context)
         {
             _context = context;
             _dbSet = context.Set<T>();
@@ -32,25 +34,25 @@ namespace TiklabChallenge.Infrastructure.Repository
 
         public async Task AddAsync(T entity) => await _dbSet.AddAsync(entity);
 
-        public async Task UpdateAsync(T entity)
+
+        public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> expression) 
+        => await _dbSet.Where(expression).ToListAsync();
+
+        public async Task AddRangeAsync(IEnumerable<T> entities)
         {
-            _dbSet.Attach(entity);
-            _context.Entry(entity).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+            await _dbSet.AddRangeAsync(entities);
         }
 
-        public async Task DeleteAsync(T entity)
+        public Task DeleteAsync(T entity)
         {
             _dbSet.Remove(entity);
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException ex) when (ex.InnerException != null)
-            {
-                throw new InvalidOperationException(
-                    "Cannot delete the entity because it is referenced by other data (foreign key constraint violation).", ex);
-            }
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteRangeAsync(IEnumerable<T> entities)
+        {
+            _dbSet.RemoveRange(entities);
+            return Task.CompletedTask;
         }
     }
 }

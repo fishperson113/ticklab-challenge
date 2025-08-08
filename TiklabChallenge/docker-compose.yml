@@ -5,19 +5,20 @@ services:
       context: .
       dockerfile: TiklabChallenge.API/Dockerfile
     ports:
-      - "5000:5000"
-      - "5001:5001"
+      - "8080:8080"
+      - "8081:8081"
     depends_on:
       - postgres
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:5000
-      - ASPNETCORE_URLS=https://+:5001
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_URLS=https://+:8081
     networks:
       - productnetwork
     restart: on-failure
 
   postgres:
+    container_name: postgres
     image: postgres:15
     restart: always
     environment:
@@ -26,7 +27,7 @@ services:
       POSTGRES_DB: ticklab-challenge
       ACCEPT_EULA: "Y"
     ports:
-      - "1433:1433"
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
