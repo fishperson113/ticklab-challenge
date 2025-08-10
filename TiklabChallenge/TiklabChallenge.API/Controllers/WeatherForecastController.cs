@@ -2,18 +2,19 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
+using TiklabChallenge.Core.Shared;
 
 namespace TiklabChallenge.API.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    [Authorize]
+    [Authorize(Roles = AppRoles.Student)]
     public class WeatherForecastController : ControllerBase
     {
         private static readonly string[] Summaries = new[]
         {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
+                "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+            };
 
         private readonly ILogger<WeatherForecastController> _logger;
         private readonly IUnitOfWork _unitOfWork;
