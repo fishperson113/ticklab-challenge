@@ -14,11 +14,16 @@ namespace TiklabChallenge.Infrastructure.UnitOfWork
     {
         private readonly ApplicationContext _context;
         public IRepository<WeatherForecast> WeatherForecasts { get; private set; }
-
+        public IStudentRepository Students { get; private set; }
+        public IRepository<Course> Courses { get; private set; }
+        public IRepository<Schedule> Schedules { get; private set; }
         public UnitOfWork(ApplicationContext context)
         {
             _context = context;
             WeatherForecasts = new GenericRepository<WeatherForecast>(_context);
+            Students = new StudentRepository(_context);
+            Courses = new GenericRepository<Course>(_context);
+            Schedules = new GenericRepository<Schedule>(_context);
         }
 
         public async Task<int> CommitAsync() =>

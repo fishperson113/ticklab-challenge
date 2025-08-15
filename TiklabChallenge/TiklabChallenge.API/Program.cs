@@ -6,7 +6,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text;
-using TiklabChallenge.API.Middleware;
 using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
 using TiklabChallenge.Infrastructure.Data;
@@ -64,6 +63,7 @@ else
 }
 
 builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
+builder.Services.AddScoped<IStudentRepository,StudentRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddIdentityCore<ApplicationUser>()
     .AddRoles<IdentityRole>()
@@ -74,6 +74,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddIdentityApiEndpoints<ApplicationUser>();
 builder.Services.AddScoped<AppSeeder, AppSeeder>();
 builder.Services.AddHostedService<SeedService>();
+builder.Services.AddScoped<StudentRegistrationService, StudentRegistrationService>();
 
 var app = builder.Build();
 
@@ -102,8 +103,7 @@ app.MapGet("/_debug/users", async (ApplicationContext db) => new {
 });
 
 var identity = app.MapGroup("");                   
-identity.AddEndpointFilter<AssignStudentRoleFilter>(); 
-identity.MapIdentityApi<ApplicationUser>();
+identity.MapCustomIdentityApi<ApplicationUser>();
 
 app.UseHttpsRedirection();
 
