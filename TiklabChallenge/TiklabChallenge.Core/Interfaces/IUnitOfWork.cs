@@ -11,8 +11,10 @@ namespace TiklabChallenge.Core.Interfaces
     {
         IRepository<WeatherForecast> WeatherForecasts { get; }
         IStudentRepository Students { get; }
-        IRepository<Course> Courses { get; }
-        IRepository<Schedule> Schedules { get; }
+        ICourseRepository Courses { get; }
+        IScheduleRepository Schedules { get; }
+        IEnrollmentRepository Enrollments { get; }
+        ISubjectRepository Subjects { get; }
         Task<int> CommitAsync();
     }
 }

@@ -17,11 +17,13 @@ namespace TiklabChallenge.Infrastructure.Repository
         }
         public async Task UpdateProfileAsync(Student student, CancellationToken ct = default)
         {
-            var existingStudent = await GetByIdAsync(student.UserId);
-
+            var existingStudent = await FirstOrDefaultAsync(s=>s.UserId==student.UserId,ct);
+            if (existingStudent == null)
+            {
+                throw new ArgumentException($"Student with ID {student.UserId} does not exist.");
+            }
             existingStudent.FullName = student.FullName;
-
-            _context.Students.Update(existingStudent);
+            existingStudent.StudentCode = student.StudentCode;
         }
     }
 }

@@ -64,6 +64,12 @@ else
 
 builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IStudentRepository,StudentRepository>();
+builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
+builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
+builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
+builder.Services.AddScoped<ICourseRepository, CourseRepository>();
+builder.Services.AddScoped<CourseSchedulingService>();
+builder.Services.AddScoped<SubjectValidationService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddIdentityCore<ApplicationUser>()
     .AddRoles<IdentityRole>()
@@ -72,9 +78,8 @@ builder.Services.AddIdentityCore<ApplicationUser>()
 builder.Services.AddAuthentication(IdentityConstants.BearerScheme);
 builder.Services.AddAuthorization();
 builder.Services.AddIdentityApiEndpoints<ApplicationUser>();
-builder.Services.AddScoped<AppSeeder, AppSeeder>();
+builder.Services.AddScoped<AppSeeder>();
 builder.Services.AddHostedService<SeedService>();
-builder.Services.AddScoped<StudentRegistrationService, StudentRegistrationService>();
 
 var app = builder.Build();
 

@@ -8,15 +8,12 @@ namespace TiklabChallenge.Core.Entities
 {
     public class Course
     {
-        public required string CourseCode { get; set; }
-        public string? CourseName { get; set; }
-        public string? Description { get; set; }
-        public int Credits { get; set; }
+        public required string CourseCode { get; set; }   
+        public required string SubjectCode { get; set; }  
+        public Subject Subject { get; set; } = default!;      
         public int? MaxEnrollment { get; set; }
         public DateTime CreatedAt { get; set; }
-        public ICollection<Enrollment>? Enrollments { get; set; }
-        public ICollection<Prerequisite>? Prerequisites { get; set; }        
-        public ICollection<Prerequisite>? RequiredBy { get; set; }          
-        public ICollection<CourseSchedule>? CourseSchedules { get; set; }
+        public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
+        public Schedule? Schedule { get; set; }
     }
 }

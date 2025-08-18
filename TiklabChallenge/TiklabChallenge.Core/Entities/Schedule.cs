@@ -10,10 +10,12 @@ namespace TiklabChallenge.Core.Entities
 
     public class Schedule
     {
-        public required string ScheduleId { get; set; }   // ví dụ: "A101", "B202"
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string? RoomId { get; set; } 
+        public string? CourseCode { get; set; }
+        public Course? Course { get; set; }
         public DayOfWeekCode DayOfWeek { get; set; }         
         public TimeOnly StartTime { get; set; }
         public TimeOnly EndTime { get; set; }
-        public required ICollection<CourseSchedule> CourseSchedules { get; set; } 
     }
 }

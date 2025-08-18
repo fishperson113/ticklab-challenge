@@ -22,9 +22,7 @@ namespace TiklabChallenge.Infrastructure.Data
         public DbSet<Course> Courses { get; set; }
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<Schedule> Schedules { get; set; }
-        public DbSet<CourseSchedule> CourseSchedules { get; set; }
-        public DbSet<Prerequisite> Prerequisites { get; set; }
-        public DbSet<ApplicationUser> ApplicationUsers { get; set; }
+        public DbSet<Subject> Subjects { get; set; }
 
         #endregion
 
@@ -47,17 +45,32 @@ namespace TiklabChallenge.Infrastructure.Data
                  .HasMaxLength(255);
             });
             #endregion
+            #region Subject Entity
+            modelBuilder.Entity<Subject>(e =>
+            {
+                e.HasKey(x => x.SubjectCode);
+                e.Property(x => x.SubjectCode).HasMaxLength(16);
+                e.Property(x => x.SubjectName).HasMaxLength(255);
 
+                e.Property(x => x.PrerequisiteSubjectCode).HasMaxLength(16);
+                e.HasOne(x => x.PrerequisiteSubject)
+                 .WithMany(s => s.RequiredBySubjects)
+                 .HasForeignKey(x => x.PrerequisiteSubjectCode)
+                 .OnDelete(DeleteBehavior.Restrict);         
+            });
+            #endregion
             #region Course Entity
             modelBuilder.Entity<Course>(e =>
             {
                 e.HasKey(x => x.CourseCode);
                 e.Property(x => x.CourseCode).HasMaxLength(32);
-                e.Property(x => x.CourseName).HasMaxLength(255);
-                e.Property(x => x.Description);
-                e.Property(x => x.Credits);
-                e.Property(x => x.MaxEnrollment);
-                e.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
+                e.Property(x => x.CreatedAt).HasDefaultValueSql("now()"); 
+
+                e.Property(x => x.SubjectCode).IsRequired().HasMaxLength(16);
+                e.HasOne(x => x.Subject)
+                 .WithMany(s => s.Courses)
+                 .HasForeignKey(x => x.SubjectCode)
+                 .OnDelete(DeleteBehavior.Restrict);         
             });
             #endregion
 
@@ -89,50 +102,22 @@ namespace TiklabChallenge.Infrastructure.Data
             #region Schedule Entity
             modelBuilder.Entity<Schedule>(e =>
             {
-                e.HasKey(x => x.ScheduleId);
-                e.Property(x => x.ScheduleId).HasMaxLength(32);
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Id).HasMaxLength(64);
 
-                e.Property(x => x.DayOfWeek)
-                 .HasConversion<string>()
-                 .HasMaxLength(16);
+                e.Property(x => x.CourseCode).IsRequired().HasMaxLength(32);
+                e.HasIndex(x => x.CourseCode).IsUnique();    
 
+                e.HasOne(x => x.Course)
+                 .WithOne(c => c.Schedule)
+                 .HasForeignKey<Schedule>(x => x.CourseCode)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.Property(x => x.DayOfWeek).HasConversion<string>().HasMaxLength(16);
                 e.Property(x => x.StartTime).HasColumnType("time");
                 e.Property(x => x.EndTime).HasColumnType("time");
-            });
-            #endregion
 
-            #region CourseSchedule Entity
-            modelBuilder.Entity<CourseSchedule>(e =>
-            {
-                e.HasKey(x => new { x.CourseCode, x.ScheduleId });
-
-                e.HasOne(x => x.Course)
-                 .WithMany(c => c.CourseSchedules)
-                 .HasForeignKey(x => x.CourseCode)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(x => x.Schedule)
-                 .WithMany(s => s.CourseSchedules)
-                 .HasForeignKey(x => x.ScheduleId)
-                 .OnDelete(DeleteBehavior.Cascade);
-            });
-            #endregion
-
-            #region Prerequisite Entity
-
-            modelBuilder.Entity<Prerequisite>(e =>
-            {
-                e.HasKey(x => new { x.CourseCode, x.PrerequisiteCode });
-
-                e.HasOne(x => x.Course)
-                 .WithMany(c => c.Prerequisites)
-                 .HasForeignKey(x => x.CourseCode)
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(x => x.RequiredCourse)
-                 .WithMany(c => c.RequiredBy)
-                 .HasForeignKey(x => x.PrerequisiteCode)
-                 .OnDelete(DeleteBehavior.Restrict); 
+                e.HasIndex(x => new { x.RoomId, x.DayOfWeek, x.StartTime, x.EndTime }).IsUnique();
             });
             #endregion
 
