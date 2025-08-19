@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,7 @@ using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
 using TiklabChallenge.Core.Shared;
 using TiklabChallenge.UseCases.DTOs;
+using TiklabChallenge.UseCases.Services;
 using Xunit;
 
 namespace TiklabChallenge.Test.Unit.Controllers
@@ -29,9 +31,9 @@ namespace TiklabChallenge.Test.Unit.Controllers
             _loggerMock = new Mock<ILogger<SchedulesController>>();
 
             _mockUow.Setup(uow => uow.Schedules).Returns(_scheduleRepoMock.Object);
-
+            var service= new CourseSchedulingService(_mockUow.Object);
             // Create controller with mocked dependencies
-            _controller = new SchedulesController(_mockUow.Object, _loggerMock.Object);
+            _controller = new SchedulesController(service, _loggerMock.Object);
         }
 
         #region Helper Methods

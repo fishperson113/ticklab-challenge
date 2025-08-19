@@ -69,7 +69,8 @@ builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
 builder.Services.AddScoped<ICourseRepository, CourseRepository>();
 builder.Services.AddScoped<CourseSchedulingService>();
-builder.Services.AddScoped<SubjectValidationService>();
+builder.Services.AddScoped<SubjectManagementService>();
+builder.Services.AddScoped<StudentEnrollmentService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddIdentityCore<ApplicationUser>()
     .AddRoles<IdentityRole>()
@@ -106,7 +107,41 @@ app.MapGet("/_debug/users", async (ApplicationContext db) => new {
     Users = await db.Users.Select(u => new { u.Id, u.UserName, u.Email }).ToListAsync(),
     Roles = await db.Roles.Select(r => r.Name).ToListAsync()
 });
+// New debug endpoints for academic data
+var debugGroup = app.MapGroup("/_debug");
 
+debugGroup.MapGet("/subjects", async (ApplicationContext db) =>
+    await db.Subjects
+        .Select(s => new {
+            s.SubjectCode,
+            s.SubjectName,
+            s.Description,
+            s.DefaultCredits,
+            s.PrerequisiteSubjectCode
+        })
+        .ToListAsync());
+debugGroup.MapGet("/courses", async (ApplicationContext db) =>
+    await db.Courses
+        .Select(c => new {
+            c.CourseCode,
+            c.SubjectCode,
+            c.MaxEnrollment,
+            c.CreatedAt,
+            SubjectName = c.Subject.SubjectName
+        })
+        .ToListAsync());
+debugGroup.MapGet("/schedules", async (ApplicationContext db) =>
+    await db.Schedules
+        .Select(s => new {
+            s.Id,
+            s.RoomId,
+            s.CourseCode,
+            Day = s.DayOfWeek.ToString(),
+            s.StartTime,
+            s.EndTime,
+            CourseName = s.Course.Subject.SubjectName
+        })
+        .ToListAsync());
 var identity = app.MapGroup("");                   
 identity.MapCustomIdentityApi<ApplicationUser>();
 

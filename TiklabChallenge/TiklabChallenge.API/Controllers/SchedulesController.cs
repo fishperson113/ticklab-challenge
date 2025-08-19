@@ -9,6 +9,7 @@ using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
 using TiklabChallenge.Core.Shared;
 using TiklabChallenge.UseCases.DTOs;
+using TiklabChallenge.UseCases.Services;
 
 namespace TiklabChallenge.API.Controllers
 {
@@ -17,26 +18,26 @@ namespace TiklabChallenge.API.Controllers
     [Authorize]
     public class SchedulesController : ControllerBase
     {
-        private readonly IUnitOfWork _uow;
+        private readonly CourseSchedulingService _schedulingService;
         private readonly ILogger<SchedulesController> _logger;
 
-        public SchedulesController(IUnitOfWork uow, ILogger<SchedulesController> logger)
+        public SchedulesController(CourseSchedulingService schedulingService, ILogger<SchedulesController> logger)
         {
-            _uow = uow;
+            _schedulingService = schedulingService;
             _logger = logger;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAllSchedules(CancellationToken ct = default)
         {
-            var schedules = await _uow.Schedules.GetAllAsync(ct);
+            var schedules = await _schedulingService.GetAllSchedulesAsync(ct);
             return Ok(schedules);
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetSchedule(string id, CancellationToken ct = default)
         {
-            var schedule = await _uow.Schedules.GetByIdWithDetailsAsync(id, ct);
+            var schedule = await _schedulingService.GetScheduleByIdAsync(id, ct);
 
             if (schedule == null)
                 return NotFound($"Schedule with ID '{id}' not found.");
@@ -47,21 +48,21 @@ namespace TiklabChallenge.API.Controllers
         [HttpGet("room/{roomId}")]
         public async Task<IActionResult> GetSchedulesByRoom(string roomId, CancellationToken ct = default)
         {
-            var schedules = await _uow.Schedules.GetByRoomIdAsync(roomId, ct);
+            var schedules = await _schedulingService.GetSchedulesByRoomAsync(roomId, ct);
             return Ok(schedules);
         }
 
         [HttpGet("course/{courseCode}")]
         public async Task<IActionResult> GetSchedulesByCourse(string courseCode, CancellationToken ct = default)
         {
-            var schedules = await _uow.Schedules.GetByCourseCodeAsync(courseCode, ct);
+            var schedules = await _schedulingService.GetSchedulesByCourseAsync(courseCode, ct);
             return Ok(schedules);
         }
 
         [HttpGet("day/{dayOfWeek}")]
         public async Task<IActionResult> GetSchedulesByDay(DayOfWeekCode dayOfWeek, CancellationToken ct = default)
         {
-            var schedules = await _uow.Schedules.GetByDayOfWeekAsync(dayOfWeek, ct);
+            var schedules = await _schedulingService.GetSchedulesByDayAsync(dayOfWeek, ct);
             return Ok(schedules);
         }
 
@@ -75,34 +76,15 @@ namespace TiklabChallenge.API.Controllers
                 if (!request.IsValid())
                     return BadRequest("Invalid schedule data. Start time must be before end time.");
 
-                // Create a new schedule
-                var schedule = new Schedule
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    RoomId = request.RoomId,
-                    CourseCode = request.CourseCode,
-                    DayOfWeek = request.DayOfWeek,
-                    StartTime = request.StartTime,
-                    EndTime = request.EndTime
-                };
-
                 // Check for schedule conflicts
-                var existingSchedules = await _uow.Schedules.GetByRoomIdAsync(request.RoomId, ct);
-                foreach (var existingSchedule in existingSchedules)
+                bool hasConflicts = await _schedulingService.HasScheduleConflictsAsync(request, ct);
+                if (hasConflicts)
                 {
-                    if (existingSchedule?.DayOfWeek == request.DayOfWeek)
-                    {
-                        // Check if time ranges overlap
-                        if (request.StartTime < existingSchedule.EndTime && request.EndTime > existingSchedule.StartTime)
-                        {
-                            return BadRequest($"Schedule conflicts with existing schedule in room {request.RoomId}");
-                        }
-                    }
+                    return BadRequest($"Schedule conflicts with existing schedule in room {request.RoomId}");
                 }
 
-                // Add the schedule to the repository
-                await _uow.Schedules.AddAsync(schedule);
-                await _uow.CommitAsync();
+                // Create the schedule using the service
+                var schedule = await _schedulingService.CreateScheduleAsync(request, ct);
 
                 _logger.LogInformation("Created schedule {Id} for course {CourseCode}", schedule.Id, schedule.CourseCode);
 
@@ -124,51 +106,29 @@ namespace TiklabChallenge.API.Controllers
         {
             try
             {
-
                 if (!request.HasValidTimeRange())
                     return BadRequest("Invalid time range. Start time must be before end time.");
 
-                // Get the existing schedule
-                var schedule = await _uow.Schedules.GetByIdAsync(request.Id, ct);
+                var schedule = await _schedulingService.UpdateScheduleAsync(request, ct);
+
                 if (schedule == null)
                     return NotFound($"Schedule with ID '{request.Id}' not found.");
-
-                // Update schedule properties
-                if (request.RoomId != null)
-                    schedule.RoomId = request.RoomId;
-
-                if (request.CourseCode != null)
-                    schedule.CourseCode = request.CourseCode;
-
-                if (request.DayOfWeek.HasValue)
-                    schedule.DayOfWeek = request.DayOfWeek.Value;
-
-                if (request.StartTime.HasValue)
-                    schedule.StartTime = request.StartTime.Value;
-
-                if (request.EndTime.HasValue)
-                    schedule.EndTime = request.EndTime.Value;
-
-                // If all necessary properties are updated, use UpdateScalarsAsync
-                if (request.RoomId != null && request.DayOfWeek.HasValue &&
-                    request.StartTime.HasValue && request.EndTime.HasValue)
-                {
-                    await _uow.Schedules.UpdateScalarsAsync(
-                        request.Id,
-                        request.RoomId,
-                        request.DayOfWeek.Value,
-                        request.StartTime.Value,
-                        request.EndTime.Value,
-                        ct);
-                }
-
-                await _uow.CommitAsync();
 
                 _logger.LogInformation("Updated schedule {Id}", request.Id);
 
                 // Get the updated schedule with course details
-                var updatedSchedule = await _uow.Schedules.GetByIdWithDetailsAsync(request.Id, ct);
+                var updatedSchedule = await _schedulingService.GetScheduleByIdAsync(request.Id, ct);
                 return Ok(updatedSchedule);
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid schedule update request");
+                return BadRequest(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                _logger.LogWarning(ex, "Schedule not found");
+                return NotFound(ex.Message);
             }
             catch (Exception ex)
             {
@@ -183,12 +143,10 @@ namespace TiklabChallenge.API.Controllers
         {
             try
             {
-                var schedule = await _uow.Schedules.GetByIdAsync(id, ct);
+                var schedule = await _schedulingService.DeleteScheduleAsync(id, ct);
+
                 if (schedule == null)
                     return NotFound($"Schedule with ID '{id}' not found.");
-
-                await _uow.Schedules.DeleteAsync(schedule);
-                await _uow.CommitAsync();
 
                 _logger.LogInformation("Deleted schedule {Id}", id);
 

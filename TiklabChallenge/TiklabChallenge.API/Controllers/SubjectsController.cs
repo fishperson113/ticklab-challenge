@@ -17,31 +17,28 @@ namespace TiklabChallenge.API.Controllers
     [Authorize]
     public class SubjectsController : ControllerBase
     {
-        private readonly IUnitOfWork _uow;
         private readonly ILogger<SubjectsController> _logger;
-        private readonly SubjectValidationService _validationService;
+        private readonly SubjectManagementService _subjectService;
 
         public SubjectsController(
-            IUnitOfWork uow,
             ILogger<SubjectsController> logger,
-            SubjectValidationService validationService)
+            SubjectManagementService subjectService)
         {
-            _uow = uow;
             _logger = logger;
-            _validationService = validationService;
+            _subjectService = subjectService;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAllSubjects(CancellationToken ct = default)
         {
-            var subjects = await _uow.Subjects.GetAllAsync(ct);
+            var subjects = await _subjectService.GetAllSubjectsAsync(ct);
             return Ok(subjects);
         }
 
         [HttpGet("{subjectCode}")]
         public async Task<IActionResult> GetSubject(string subjectCode, CancellationToken ct = default)
         {
-            var subject = await _uow.Subjects.GetBySubjectCodeAsync(subjectCode, ct);
+            var subject = await _subjectService.GetSubjectByCodeAsync(subjectCode, ct);
 
             if (subject == null)
                 return NotFound($"Subject with code '{subjectCode}' not found.");
@@ -52,11 +49,11 @@ namespace TiklabChallenge.API.Controllers
         [HttpGet("{subjectCode}/prerequisites")]
         public async Task<IActionResult> GetPrerequisiteChain(string subjectCode, CancellationToken ct = default)
         {
-            var subject = await _uow.Subjects.GetBySubjectCodeAsync(subjectCode, ct);
+            var subject = await _subjectService.GetSubjectByCodeAsync(subjectCode, ct);
             if (subject == null)
                 return NotFound($"Subject with code '{subjectCode}' not found.");
 
-            var chain = await _validationService.GetPrerequisiteChainAsync(subjectCode, ct);
+            var chain = await _subjectService.GetPrerequisiteChainAsync(subjectCode, ct);
             return Ok(chain);
         }
 
@@ -66,37 +63,19 @@ namespace TiklabChallenge.API.Controllers
         {
             try
             {
-                var exists = await _uow.Subjects.ExistsAsync(s => s.SubjectCode == request.SubjectCode, ct);
-                if (exists)
-                    return Conflict($"Subject with code '{request.SubjectCode}' already exists.");
-
-                // Validate prerequisite if provided
-                if (!string.IsNullOrWhiteSpace(request.PrerequisiteSubjectCode))
-                {
-                    var (isValid, errorMessage) = await _validationService.ValidatePrerequisiteAsync(
-                        request.SubjectCode, request.PrerequisiteSubjectCode, ct);
-
-                    if (!isValid)
-                        return BadRequest(errorMessage);
-                }
-
-                var subject = new Subject
-                {
-                    SubjectCode = request.SubjectCode,
-                    SubjectName = request.SubjectName,
-                    Description = request.Description,
-                    DefaultCredits = request.DefaultCredits,
-                    PrerequisiteSubjectCode = !string.IsNullOrWhiteSpace(request.PrerequisiteSubjectCode)
-                        ? request.PrerequisiteSubjectCode.Trim()
-                        : null
-                };
-
-                await _uow.Subjects.AddAsync(subject);
-                await _uow.CommitAsync();
+                var subject = await _subjectService.CreateSubjectAsync(request, ct);
 
                 _logger.LogInformation("Created new subject with code {SubjectCode}", subject.SubjectCode);
 
                 return CreatedAtAction(nameof(GetSubject), new { subjectCode = subject.SubjectCode }, subject);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
@@ -114,34 +93,7 @@ namespace TiklabChallenge.API.Controllers
         {
             try
             {
-                var subject = await _uow.Subjects.GetBySubjectCodeAsync(subjectCode, ct);
-                if (subject == null)
-                    return NotFound($"Subject with code '{subjectCode}' not found.");
-
-                // Validate prerequisite if it's being changed
-                if (request.PrerequisiteSubjectCode != null &&
-                    request.PrerequisiteSubjectCode != subject.PrerequisiteSubjectCode)
-                {
-                    var (isValid, errorMessage) = await _validationService.ValidatePrerequisiteAsync(
-                        subjectCode, request.PrerequisiteSubjectCode, ct);
-
-                    if (!isValid)
-                        return BadRequest(errorMessage);
-                }
-
-                // Use UpdateScalarsAsync instead of direct property updates
-                await _uow.Subjects.UpdateScalarsAsync(
-                    subjectCode,
-                    request.SubjectName,
-                    request.Description,
-                    request.DefaultCredits,
-                    request.PrerequisiteSubjectCode,
-                    ct);
-
-                await _uow.CommitAsync();
-
-                // Get the updated subject
-                subject = await _uow.Subjects.GetBySubjectCodeAsync(subjectCode, ct);
+                var subject = await _subjectService.UpdateSubjectAsync(subjectCode, request, ct);
 
                 _logger.LogInformation("Updated subject with code {SubjectCode}", subject?.SubjectCode);
 
@@ -151,7 +103,7 @@ namespace TiklabChallenge.API.Controllers
             {
                 return NotFound(ex.Message);
             }
-            catch (InvalidOperationException ex)
+            catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);
             }
@@ -171,7 +123,7 @@ namespace TiklabChallenge.API.Controllers
         {
             try
             {
-                var results = await _validationService.ValidateSubjectsForStudentAsync(
+                var results = await _subjectService.ValidateSubjectsForStudentAsync(
                     studentId, subjectCodes, ct);
 
                 return Ok(results);

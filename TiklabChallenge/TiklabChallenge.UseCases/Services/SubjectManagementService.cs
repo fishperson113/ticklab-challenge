@@ -6,18 +6,96 @@ using System.Text;
 using System.Threading.Tasks;
 using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
+using TiklabChallenge.UseCases.DTOs;
 
 namespace TiklabChallenge.UseCases.Services
 {
-    public class SubjectValidationService
+    public class SubjectManagementService
     {
-        public readonly IUnitOfWork _uow;
+        private readonly IUnitOfWork _uow;
 
-        public SubjectValidationService(IUnitOfWork uow)
+        public SubjectManagementService(IUnitOfWork uow)
         {
             _uow = uow;
         }
+        public async Task<IEnumerable<Subject?>> GetAllSubjectsAsync(CancellationToken ct = default)
+        {
+            return await _uow.Subjects.GetAllAsync(ct);
+        }
 
+        public async Task<Subject?> GetSubjectByCodeAsync(string subjectCode, CancellationToken ct = default)
+        {
+            return await _uow.Subjects.GetBySubjectCodeAsync(subjectCode, ct);
+        }
+
+        public async Task<Subject> CreateSubjectAsync(CreateSubjectRequest request, CancellationToken ct = default)
+        {
+            // Check if subject with this code already exists
+            var exists = await _uow.Subjects.ExistsAsync(s => s.SubjectCode == request.SubjectCode, ct);
+            if (exists)
+                throw new InvalidOperationException($"Subject with code '{request.SubjectCode}' already exists.");
+
+            // Validate prerequisite if provided
+            if (!string.IsNullOrWhiteSpace(request.PrerequisiteSubjectCode))
+            {
+                var (isValid, errorMessage) = await ValidatePrerequisiteAsync(
+                    request.SubjectCode, request.PrerequisiteSubjectCode, ct);
+
+                if (!isValid)
+                    throw new ArgumentException(errorMessage);
+            }
+
+            var subject = new Subject
+            {
+                SubjectCode = request.SubjectCode,
+                SubjectName = request.SubjectName,
+                Description = request.Description,
+                DefaultCredits = request.DefaultCredits,
+                PrerequisiteSubjectCode = !string.IsNullOrWhiteSpace(request.PrerequisiteSubjectCode)
+                    ? request.PrerequisiteSubjectCode.Trim()
+                    : null
+            };
+
+            await _uow.Subjects.AddAsync(subject);
+            await _uow.CommitAsync();
+
+            return subject;
+        }
+
+        public async Task<Subject?> UpdateSubjectAsync(
+            string subjectCode,
+            UpdateSubjectRequest request,
+            CancellationToken ct = default)
+        {
+            var subject = await _uow.Subjects.GetBySubjectCodeAsync(subjectCode, ct);
+            if (subject == null)
+                throw new KeyNotFoundException($"Subject with code '{subjectCode}' not found.");
+
+            // Validate prerequisite if it's being changed
+            if (request.PrerequisiteSubjectCode != null &&
+                request.PrerequisiteSubjectCode != subject.PrerequisiteSubjectCode)
+            {
+                var (isValid, errorMessage) = await ValidatePrerequisiteAsync(
+                    subjectCode, request.PrerequisiteSubjectCode, ct);
+
+                if (!isValid)
+                    throw new ArgumentException(errorMessage);
+            }
+
+            // Use UpdateScalarsAsync instead of direct property updates
+            await _uow.Subjects.UpdateScalarsAsync(
+                subjectCode,
+                request.SubjectName,
+                request.Description,
+                request.DefaultCredits,
+                request.PrerequisiteSubjectCode,
+                ct);
+
+            await _uow.CommitAsync();
+
+            // Get the updated subject
+            return await _uow.Subjects.GetBySubjectCodeAsync(subjectCode, ct);
+        }
         // Check if a student can take a subject based on prerequisites
         public async Task<(bool IsValid, string? ErrorMessage)> CanTakeSubjectAsync(
             string studentId, string subjectCode, CancellationToken ct = default)

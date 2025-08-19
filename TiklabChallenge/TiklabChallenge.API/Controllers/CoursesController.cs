@@ -26,14 +26,14 @@ namespace TiklabChallenge.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAllCourses(CancellationToken ct = default)
         {
-            var courses = await _courseService._uow.Courses.GetAllAsync(ct);
+            var courses = await _courseService.GetAllCoursesAsync(ct);
             return Ok(courses);
         }
 
         [HttpGet("{courseCode}")]
         public async Task<IActionResult> GetCourse(string courseCode, CancellationToken ct = default)
         {
-            var course = await _courseService._uow.Courses.GetByCourseCodeAsync(courseCode, ct);
+            var course = await _courseService.GetByCourseCodeAsync(courseCode, ct);
 
             if (course == null)
                 return NotFound($"Course with code '{courseCode}' not found.");
@@ -44,7 +44,7 @@ namespace TiklabChallenge.API.Controllers
         [HttpGet("subject/{subjectCode}")]
         public async Task<IActionResult> GetCoursesBySubject(string subjectCode, CancellationToken ct = default)
         {
-            var courses = await _courseService._uow.Courses.GetBySubjectAsync(subjectCode, ct);
+            var courses = await _courseService.GetBySubjectAsync(subjectCode, ct);
             return Ok(courses);
         }
 

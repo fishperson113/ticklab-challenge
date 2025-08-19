@@ -20,5 +20,8 @@ namespace TiklabChallenge.UseCases.DTOs
         public required string FullName { get; set; }
         public required string StudentCode { get; set; }
     }
-
+    public class CourseEnrollmentRequest
+    {
+        public string CourseCode { get; set; } = string.Empty;
+    }
 }

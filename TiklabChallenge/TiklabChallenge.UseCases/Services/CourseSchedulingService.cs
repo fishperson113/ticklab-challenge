@@ -13,7 +13,7 @@ namespace TiklabChallenge.UseCases.Services
 {
     public class CourseSchedulingService
     {
-        public readonly IUnitOfWork _uow;
+        private readonly IUnitOfWork _uow;
 
         public CourseSchedulingService(IUnitOfWork uow)
         {
@@ -174,7 +174,7 @@ namespace TiklabChallenge.UseCases.Services
             return schedule;
         }
 
-        public async Task<Schedule?> CreateScheduleAsync(ScheduleCreateRequest req, CancellationToken ct = default)
+        public async Task<Schedule> CreateScheduleAsync(ScheduleCreateRequest req, CancellationToken ct = default)
         {
             var schedule = new Schedule
             {
@@ -196,7 +196,7 @@ namespace TiklabChallenge.UseCases.Services
             return await _uow.Courses.GetAllAsync(ct);
         }
 
-        public async Task<Course?> GetCourseByCodeAsync(string courseCode, CancellationToken ct = default)
+        public async Task<Course?> GetByCourseCodeAsync(string courseCode, CancellationToken ct = default)
         {
             return await _uow.Courses.GetByCourseCodeAsync(courseCode, ct);
         }
@@ -205,5 +205,63 @@ namespace TiklabChallenge.UseCases.Services
         {
             return await _uow.Courses.GetBySubjectAsync(subjectCode, ct);
         }
+        public async Task<IEnumerable<Course?>> GetBySubjectAsync (string subjectCode, CancellationToken ct = default)
+        {
+            return await _uow.Courses.GetBySubjectAsync(subjectCode, ct);
+        }
+        public async Task<IEnumerable<Schedule?>> GetAllSchedulesAsync(CancellationToken ct = default)
+        {
+            return await _uow.Schedules.GetAllAsync(ct);
+        }
+
+        public async Task<Schedule?> GetScheduleByIdAsync(string id, CancellationToken ct = default)
+        {
+            return await _uow.Schedules.GetByIdWithDetailsAsync(id, ct);
+        }
+
+        public async Task<IEnumerable<Schedule?>> GetSchedulesByRoomAsync(string roomId, CancellationToken ct = default)
+        {
+            return await _uow.Schedules.GetByRoomIdAsync(roomId, ct);
+        }
+
+        public async Task<IEnumerable<Schedule?>> GetSchedulesByCourseAsync(string courseCode, CancellationToken ct = default)
+        {
+            return await _uow.Schedules.GetByCourseCodeAsync(courseCode, ct);
+        }
+
+        public async Task<IEnumerable<Schedule?>> GetSchedulesByDayAsync(DayOfWeekCode dayOfWeek, CancellationToken ct = default)
+        {
+            return await _uow.Schedules.GetByDayOfWeekAsync(dayOfWeek, ct);
+        }
+
+        public async Task<bool> HasScheduleConflictsAsync(ScheduleCreateRequest request, CancellationToken ct = default)
+        {
+            var existingSchedules = await _uow.Schedules.GetByRoomIdAsync(request.RoomId, ct);
+            foreach (var existingSchedule in existingSchedules)
+            {
+                if (existingSchedule?.DayOfWeek == request.DayOfWeek)
+                {
+                    // Check if time ranges overlap
+                    if (request.StartTime < existingSchedule.EndTime && request.EndTime > existingSchedule.StartTime)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        public async Task<Schedule?> DeleteScheduleAsync(string id, CancellationToken ct = default)
+        {
+            var schedule = await _uow.Schedules.GetByIdAsync(id, ct);
+            if (schedule == null)
+                return null;
+
+            await _uow.Schedules.DeleteAsync(schedule);
+            await _uow.CommitAsync();
+
+            return schedule;
+        }
+
     }
 }

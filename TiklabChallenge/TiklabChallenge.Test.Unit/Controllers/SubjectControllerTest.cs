@@ -20,7 +20,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
         private readonly Mock<IUnitOfWork> _mockUow;
         private readonly Mock<ISubjectRepository> _subjectRepoMock;
         private readonly Mock<ILogger<SubjectsController>> _loggerMock;
-        private readonly SubjectValidationService _validationServiceMock;
+        private readonly SubjectManagementService _validationServiceMock;
         private readonly SubjectsController _controller;
 
         public SubjectControllerTest()
@@ -28,12 +28,12 @@ namespace TiklabChallenge.Test.Unit.Controllers
             _mockUow = new Mock<IUnitOfWork>();
             _subjectRepoMock = new Mock<ISubjectRepository>();
             _loggerMock = new Mock<ILogger<SubjectsController>>();
-            _validationServiceMock = new SubjectValidationService(_mockUow.Object);
+            _validationServiceMock = new SubjectManagementService(_mockUow.Object);
 
             _mockUow.Setup(uow => uow.Subjects).Returns(_subjectRepoMock.Object);
 
             // Create controller with mocked dependencies
-            _controller = new SubjectsController(_mockUow.Object, _loggerMock.Object, _validationServiceMock);
+            _controller = new SubjectsController(_loggerMock.Object, _validationServiceMock);
         }
 
         #region Helper Methods
