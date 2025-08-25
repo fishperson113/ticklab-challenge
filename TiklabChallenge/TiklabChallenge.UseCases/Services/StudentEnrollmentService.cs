@@ -13,17 +13,10 @@ namespace TiklabChallenge.UseCases.Services
     public class StudentEnrollmentService
     {
         private readonly IUnitOfWork _uow;
-        private readonly SubjectManagementService _subjectService;
-        private readonly CourseSchedulingService _courseService;
 
-        public StudentEnrollmentService(
-            IUnitOfWork uow,
-            SubjectManagementService subjectService,
-            CourseSchedulingService courseService)
+        public StudentEnrollmentService(IUnitOfWork uow)
         {
             _uow = uow;
-            _subjectService = subjectService;
-            _courseService = courseService;
         }
 
         public async Task<Student?> GetStudentProfileAsync(string userId, CancellationToken ct = default)
@@ -88,44 +81,42 @@ namespace TiklabChallenge.UseCases.Services
             if (existingEnrollment != null)
                 throw new Exception($"You are already enrolled in course '{request.CourseCode}'.");
 
-            // Check enrollment capacity
-            await ValidateEnrollmentCapacityAsync(request.CourseCode, ct);
-
             // Validate prerequisites
             await ValidatePrerequisitesAsync(studentId, course.SubjectCode, ct);
 
             // Check for schedule conflicts
             await ValidateScheduleConflictsAsync(studentId, request.CourseCode, ct);
 
+            var isCourseAtMaxCapacity = await IsCourseAtMaxCapacityAsync(request.CourseCode, ct);
             // Create the enrollment
             var enrollment = new Enrollment
             {
                 StudentId = studentId,
                 CourseCode = request.CourseCode,
                 EnrolledAt = DateTime.UtcNow,
-                Status = EnrollmentStatus.Enrolled,
+                Status = isCourseAtMaxCapacity ? EnrollmentStatus.Waitlisted : EnrollmentStatus.Enrolled,
                 Student = student,
                 Course = course
             };
 
             await _uow.Enrollments.AddAsync(enrollment);
+
+            if (isCourseAtMaxCapacity)
+            {
+                var waitlist = new Waitlist
+                {
+                    StudentId = studentId,
+                    CourseCode = request.CourseCode,
+                    CreatedAt = DateTime.UtcNow,
+                    Enrollment = enrollment
+                };
+
+                await _uow.Waitlists.AddAsync(waitlist);
+            }
+
             await _uow.CommitAsync();
 
             return enrollment;
-        }
-
-        private async Task ValidateEnrollmentCapacityAsync(
-            string courseCode,
-            CancellationToken ct = default)
-        {
-            var course = await _uow.Courses.GetByCourseCodeAsync(courseCode, ct);
-            if (course == null)
-                throw new Exception($"Course with code '{courseCode}' not found.");
-
-            // Check if the course has reached maximum enrollment
-            var currentEnrollmentCount = await _uow.Enrollments.CountEnrolledAsync(courseCode, ct);
-            if (course.MaxEnrollment.HasValue && currentEnrollmentCount >= course.MaxEnrollment.Value)
-                throw new Exception($"Course '{courseCode}' has reached maximum enrollment capacity.");
         }
         private async Task ValidatePrerequisitesAsync(
             string studentId,
@@ -196,6 +187,80 @@ namespace TiklabChallenge.UseCases.Services
                 ct);
 
             return enrollments.Any();
+        }
+        private async Task<bool> IsCourseAtMaxCapacityAsync(
+           string courseCode,
+           CancellationToken ct = default)
+        {
+            var course = await _uow.Courses.GetByCourseCodeAsync(courseCode, ct);
+            if (course == null)
+                throw new Exception($"Course with code '{courseCode}' not found.");
+
+            if (!course.MaxEnrollment.HasValue)
+                return false; // No enrollment limit
+
+            // Get current enrollment count
+            var currentEnrollmentCount = await _uow.Enrollments.CountEnrolledAsync(courseCode, ct);
+            return currentEnrollmentCount >= course.MaxEnrollment.Value;
+        }
+        public async Task WithdrawFromCourseAsync(string studentId, string courseCode, CancellationToken ct = default)
+        {
+            var enrollment = await _uow.Enrollments.FirstOrDefaultAsync(studentId, courseCode, ct);
+            if (enrollment == null)
+                throw new Exception($"No enrollment found for course '{courseCode}'.");
+
+            // If the student is enrolled (not waitlisted), we need to process the waitlist
+            var wasEnrolled = enrollment.Status == EnrollmentStatus.Enrolled;
+
+            // Delete the enrollment
+            await _uow.Enrollments.DeleteAsync(enrollment);
+
+            // If the student was actively enrolled, try to enroll the next student from waitlist
+            if (wasEnrolled)
+            {
+                await ProcessNextInWaitlistAsync(courseCode, ct);
+            }
+
+            await _uow.CommitAsync();
+        }
+        private async Task ProcessNextInWaitlistAsync(string courseCode, CancellationToken ct = default)
+        {
+            var waitlistedStudents = await _uow.Waitlists.GetByCourseAsync(courseCode, ct);
+
+            foreach (var waitlistEntry in waitlistedStudents)
+            {
+                try
+                {
+                    // Get their enrollment
+                    var waitlistedEnrollment = await _uow.Enrollments.FirstOrDefaultAsync(
+                        waitlistEntry.StudentId, courseCode, ct);
+
+                    if (waitlistedEnrollment == null || waitlistedEnrollment.Status != EnrollmentStatus.Waitlisted)
+                        continue; 
+
+                    // Verify prerequisites
+                    var course = await _uow.Courses.GetByCourseCodeAsync(courseCode, ct);
+                    if (course != null)
+                    {
+                        await ValidatePrerequisitesAsync(waitlistEntry.StudentId, course.SubjectCode, ct);
+                    }
+
+                    // Check for schedule conflicts
+                    await ValidateScheduleConflictsAsync(waitlistEntry.StudentId, courseCode, ct);
+
+                    // If validation passes (no exceptions thrown), promote student to enrolled
+                    waitlistedEnrollment.Status = EnrollmentStatus.Enrolled;
+                    await _uow.Waitlists.DeleteAsync(waitlistEntry);
+
+                    return;
+                }
+                catch (Exception)
+                {
+                    // If validation fails for this student, continue to the next one in the queue
+                    // The failed student stays in the waitlist at their original position
+                    continue;
+                }
+            }
         }
     }
 }

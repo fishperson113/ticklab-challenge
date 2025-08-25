@@ -15,6 +15,8 @@ namespace TiklabChallenge.Core.Interfaces
         IScheduleRepository Schedules { get; }
         IEnrollmentRepository Enrollments { get; }
         ISubjectRepository Subjects { get; }
+        IWaitlistRepository Waitlists { get; }
+
         Task<int> CommitAsync();
     }
 }

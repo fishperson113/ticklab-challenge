@@ -28,7 +28,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
         private readonly StudentsController _controller;
         private readonly Mock<IStudentRepository> _studentRepoMock;
         private readonly Mock<IEnrollmentRepository> _enrollmentRepoMock;
-
+        private readonly Mock<IWaitlistRepository> _waitlistRepoMock;
         public StudentsControllerTests()
         {
             _loggerMock = new Mock<ILogger<StudentsController>>();
@@ -41,6 +41,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var scheduleRepoMock = new Mock<IScheduleRepository>();
             _enrollmentRepoMock = new Mock<IEnrollmentRepository>();
             var subjectRepoMock = new Mock<ISubjectRepository>();
+            _waitlistRepoMock = new Mock<IWaitlistRepository>();
 
             // Setup the IUnitOfWork to return these repositories
             _mockUow.Setup(uow => uow.Students).Returns(_studentRepoMock.Object);
@@ -48,7 +49,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             _mockUow.Setup(uow => uow.Schedules).Returns(scheduleRepoMock.Object);
             _mockUow.Setup(uow => uow.Enrollments).Returns(_enrollmentRepoMock.Object);
             _mockUow.Setup(uow => uow.Subjects).Returns(subjectRepoMock.Object);
-
+            _mockUow.Setup(uow => uow.Waitlists).Returns(_waitlistRepoMock.Object);
             // Setup student repository
             _studentRepoMock.Setup(repo => repo.GetByIdAsync(
                 It.IsAny<object>(),
@@ -145,7 +146,63 @@ namespace TiklabChallenge.Test.Unit.Controllers
                         return 25; // Max capacity
                     return 10; // Default count
                 });
+            _waitlistRepoMock.Setup(repo => repo.GetByCourseAsync(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string courseCode, CancellationToken ct) =>
+                {
+                    // For CS301.1 (max capacity course), return a waitlisted student
+                    if (courseCode == "CS301.1")
+                    {
+                        var waitlistedUser = CreateTestUser("user2", "waitlisted@example.com");
+                        var waitlistedEnrollment = CreateTestEnrollment(waitlistedUser.Id, courseCode);
+                        waitlistedEnrollment.Status = EnrollmentStatus.Waitlisted;
 
+                        return new List<Waitlist>
+                        {
+                            new Waitlist
+                            {
+                                StudentId = waitlistedUser.Id,
+                                CourseCode = courseCode,
+                                CreatedAt = DateTime.UtcNow,
+                                Enrollment = waitlistedEnrollment
+                            }
+                        };
+                    }
+                    // For CS102.1 (course with prerequisites), return two waitlisted students
+                    else if (courseCode == "CS102.1")
+                    {
+                        var failedValidationUser = CreateTestUser("user2", "failed@example.com");
+                        var validWaitlistedUser = CreateTestUser("user3", "valid@example.com");
+
+                        var failedWaitlistedEnrollment = CreateTestEnrollment(failedValidationUser.Id, courseCode);
+                        failedWaitlistedEnrollment.Status = EnrollmentStatus.Waitlisted;
+
+                        var validWaitlistedEnrollment = CreateTestEnrollment(validWaitlistedUser.Id, courseCode);
+                        validWaitlistedEnrollment.Status = EnrollmentStatus.Waitlisted;
+
+                        return new List<Waitlist>
+                        {
+                            new Waitlist
+                            {
+                                StudentId = failedValidationUser.Id,
+                                CourseCode = courseCode,
+                                CreatedAt = DateTime.UtcNow.AddMinutes(-30), // Earlier timestamp (first in queue)
+                                Enrollment = failedWaitlistedEnrollment
+                            },
+                            new Waitlist
+                            {
+                                StudentId = validWaitlistedUser.Id,
+                                CourseCode = courseCode,
+                                CreatedAt = DateTime.UtcNow, // Later timestamp (second in queue)
+                                Enrollment = validWaitlistedEnrollment
+                            }
+                        };
+                    }
+
+                    // Default: no waitlisted students
+                    return new List<Waitlist>();
+                });
             // Mock UserManager (requires special setup)
             var userStoreMock = new Mock<IUserStore<ApplicationUser>>();
             _userManagerMock = new Mock<UserManager<ApplicationUser>>(
@@ -157,9 +214,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
 
             // Create a mock for StudentEnrollmentService with the proper SubjectManagementService mock
             _enrollmentServiceMock = new StudentEnrollmentService(
-                _mockUow.Object,
-                subjectServiceMock,
-                _service);
+                _mockUow.Object);
 
             // Create controller with mocked dependencies
             _controller = new StudentsController(
@@ -465,21 +520,26 @@ namespace TiklabChallenge.Test.Unit.Controllers
         }
 
         [Fact]
-        public async Task EnrollInCourse_CourseCapacityReached_ReturnsBadRequest()
+        public async Task EnrollInCourse_CourseAtMaxCapacity_AddsToWaitlist()
         {
             // Arrange
             var user = CreateTestUser();
-            var request = new CourseEnrollmentRequest { CourseCode = "CS301.1" };
+            var request = new CourseEnrollmentRequest { CourseCode = "CS301.1" }; // At max capacity course
 
             SetupUserManagerGetUser(user);
-            SetupStudentRepoGetUserById(CreateTestStudent(user)); // Ensure student exists
+            SetupStudentRepoGetUserById(CreateTestStudent(user));
 
             // Act
             var result = await _controller.EnrollInCourse(request);
 
             // Assert
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-            Assert.Contains("maximum enrollment capacity", badRequestResult.Value?.ToString() ?? string.Empty);
+            var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result);
+
+            // Verify that the enrollment was created with Waitlisted status
+            var returnedValue = createdAtActionResult.Value;
+            var statusProperty = returnedValue.GetType().GetProperty("Status");
+            var status = (EnrollmentStatus)statusProperty.GetValue(returnedValue);
+            Assert.Equal(EnrollmentStatus.Waitlisted, status);
         }
 
         #endregion
@@ -601,6 +661,131 @@ namespace TiklabChallenge.Test.Unit.Controllers
             // Assert
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
             Assert.Contains("Schedule conflict", badRequestResult.Value?.ToString() ?? string.Empty);
+        }
+        [Fact]
+        public async Task WithdrawFromCourse_CourseNotAtCapacity_ReturnsNoContent()
+        {
+            // Arrange
+            var user = CreateTestUser();
+            var courseCode = "CS101.1"; // Course not at max capacity
+            var enrollment = CreateTestEnrollment(user.Id, courseCode);
+            enrollment.Status = EnrollmentStatus.Enrolled;
+
+            SetupUserManagerGetUser(user);
+
+            _enrollmentRepoMock.Setup(repo => repo.FirstOrDefaultAsync(
+                user.Id, courseCode, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(enrollment);
+
+            // Act
+            var result = await _controller.WithdrawFromCourse(courseCode);
+
+            // Assert
+            Assert.IsType<NoContentResult>(result);
+        }
+
+        [Fact]
+        public async Task WithdrawFromCourse_CourseAtCapacityWithWaitlist_MovesStudentFromWaitlist()
+        {
+            // Arrange
+            var user = CreateTestUser();
+            var courseCode = "CS301.1"; // Course at max capacity
+
+            var enrollment = CreateTestEnrollment(user.Id, courseCode);
+            enrollment.Status = EnrollmentStatus.Enrolled;
+
+            var waitlistedUser = CreateTestUser("user2", "waitlisted@example.com");
+            var waitlistedEnrollment = CreateTestEnrollment(waitlistedUser.Id, courseCode);
+            waitlistedEnrollment.Status = EnrollmentStatus.Waitlisted;
+
+            SetupUserManagerGetUser(user);
+
+            _enrollmentRepoMock.Setup(repo => repo.FirstOrDefaultAsync(
+                user.Id, courseCode, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(enrollment);
+
+            _enrollmentRepoMock.Setup(repo => repo.FirstOrDefaultAsync(
+                waitlistedUser.Id, courseCode, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(waitlistedEnrollment);
+
+            // Act
+            var result = await _controller.WithdrawFromCourse(courseCode);
+
+            // Assert
+            Assert.IsType<NoContentResult>(result);
+            Assert.Equal(EnrollmentStatus.Enrolled, waitlistedEnrollment.Status);
+        }
+
+        [Fact]
+        public async Task WithdrawFromCourse_FirstWaitlistedStudentFailsValidation_ProcessesNextStudent()
+        {
+            // Arrange
+            var user = CreateTestUser(); 
+            var courseCode = "CS102.1"; // Course requiring CS101 prerequisite validation
+
+            // Setup the enrollment for the withdrawing user
+            var enrollment = CreateTestEnrollment(user.Id, courseCode);
+            enrollment.Status = EnrollmentStatus.Enrolled;
+
+            var failedValidationUser = CreateTestUser("user2", "failed@example.com");
+            var validWaitlistedUser = CreateTestUser("user3", "valid@example.com");
+
+            var failedStudent = CreateTestStudent(failedValidationUser, "S" + failedValidationUser.Id, "Failed Student");
+            var validStudent = CreateTestStudent(validWaitlistedUser, "S" + validWaitlistedUser.Id, "Valid Student");
+
+            var failedWaitlistedEnrollment = CreateTestEnrollment(failedValidationUser.Id, courseCode);
+            failedWaitlistedEnrollment.Status = EnrollmentStatus.Waitlisted;
+
+            var validWaitlistedEnrollment = CreateTestEnrollment(validWaitlistedUser.Id, courseCode);
+            validWaitlistedEnrollment.Status = EnrollmentStatus.Waitlisted;
+
+            var prerequisiteCourse = new Course
+            {
+                CourseCode = "CS101.1",
+                SubjectCode = "CS101"
+            };
+            var prereqData = new List<Enrollment> {
+                new Enrollment {
+                    StudentId = validWaitlistedUser.Id,
+                    CourseCode = "CS101.1",
+                    IsPassed = true,
+                    Course = new Course { CourseCode = "CS101.1", SubjectCode = "CS101" },
+                    Student = validStudent
+                }
+            };
+            SetupUserManagerGetUser(user);
+
+            // Setup enrollment repository for the withdrawing user
+            _enrollmentRepoMock.Setup(repo => repo.FirstOrDefaultAsync(
+                user.Id, courseCode, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(enrollment);
+
+            // Setup enrollment repositories for the waitlisted users
+            _enrollmentRepoMock.Setup(repo => repo.FirstOrDefaultAsync(
+                failedValidationUser.Id, courseCode, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(failedWaitlistedEnrollment);
+
+            _enrollmentRepoMock.Setup(repo => repo.FirstOrDefaultAsync(
+                validWaitlistedUser.Id, courseCode, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(validWaitlistedEnrollment);
+
+            _enrollmentRepoMock.Setup(r => r.FindAsync(
+                          It.IsAny<Expression<Func<Enrollment, bool>>>(),
+                          It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<Enrollment, bool>> pred, CancellationToken _) =>
+            prereqData.AsQueryable().Where(pred).ToList());
+
+            // Act
+            var result = await _controller.WithdrawFromCourse(courseCode);
+
+            // Assert
+            Assert.IsType<NoContentResult>(result);
+
+            // First waitlisted student should remain waitlisted
+            Assert.Equal(EnrollmentStatus.Waitlisted, failedWaitlistedEnrollment.Status);
+
+            // Second waitlisted student should be promoted to enrolled
+            Assert.Equal(EnrollmentStatus.Enrolled, validWaitlistedEnrollment.Status);
         }
     }
 }
