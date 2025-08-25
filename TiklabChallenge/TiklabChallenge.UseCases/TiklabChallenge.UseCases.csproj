@@ -8,11 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TiklabChallenge.Core\TiklabChallenge.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="DTOs\" />
-    <Folder Include="Services\" />
+    <ProjectReference Include="..\TiklabChallenge.Infrastructure\TiklabChallenge.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

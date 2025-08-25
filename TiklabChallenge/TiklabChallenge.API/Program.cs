@@ -1,9 +1,18 @@
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Reflection;
+using System.Text;
+using TiklabChallenge.API.Middleware;
+using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
 using TiklabChallenge.Infrastructure.Data;
 using TiklabChallenge.Infrastructure.Repository;
 using TiklabChallenge.Infrastructure.UnitOfWork;
+using TiklabChallenge.UseCases.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -11,7 +20,34 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() { Title = "Tiklab API", Version = "v1" });
+    c.AddSecurityDefinition("Bearer", new()
+    {
+        Description = "Nhập token theo dạng: Bearer {token}",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",                      
+        BearerFormat = "Opaque"                 
+    });
+    c.AddSecurityRequirement(new()
+    {
+        {
+            new()
+            {
+                Reference = new()
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
 
 bool useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase");
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -29,6 +65,15 @@ else
 
 builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddIdentityCore<ApplicationUser>()
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationContext>();
+
+builder.Services.AddAuthentication(IdentityConstants.BearerScheme);
+builder.Services.AddAuthorization();
+builder.Services.AddIdentityApiEndpoints<ApplicationUser>();
+builder.Services.AddScoped<AppSeeder, AppSeeder>();
+builder.Services.AddHostedService<SeedService>();
 
 var app = builder.Build();
 
@@ -38,19 +83,31 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-if (!useInMemory)
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
+    var services = scope.ServiceProvider;
+    var dbContext = services.GetRequiredService<ApplicationContext>();
+    if(useInMemory)
     {
-        var services = scope.ServiceProvider;
-        var dbContext = services.GetRequiredService<ApplicationContext>();
-
-        dbContext.Database.Migrate();
+        dbContext.Database.EnsureCreated();
     }
-}    
+    else
+    {
+       dbContext.Database.Migrate();
+    }    
+}
+app.MapGet("/_debug/users", async (ApplicationContext db) => new {
+    Users = await db.Users.Select(u => new { u.Id, u.UserName, u.Email }).ToListAsync(),
+    Roles = await db.Roles.Select(r => r.Name).ToListAsync()
+});
+
+var identity = app.MapGroup("");                   
+identity.AddEndpointFilter<AssignStudentRoleFilter>(); 
+identity.MapIdentityApi<ApplicationUser>();
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
