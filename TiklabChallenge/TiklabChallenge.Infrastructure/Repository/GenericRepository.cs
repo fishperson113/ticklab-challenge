@@ -21,21 +21,16 @@ namespace TiklabChallenge.Infrastructure.Repository
             _dbSet = context.Set<T>();
         }
 
-        public async Task<T> GetByIdAsync(object id)
+        public async Task<T?> GetByIdAsync(object id, CancellationToken ct = default)
         {
-            var entity = await _dbSet.FindAsync(id);
-            if (entity == null)
-                throw new KeyNotFoundException($"Entity with id {id} not found.");
-
-            return entity;
+            return await _dbSet.FindAsync(id);
         }
 
-        public async Task<IEnumerable<T>> GetAllAsync() => await _dbSet.ToListAsync();
+        public async Task<IEnumerable<T?>> GetAllAsync(CancellationToken ct = default) => await _dbSet.ToListAsync();
 
         public async Task AddAsync(T entity) => await _dbSet.AddAsync(entity);
 
-
-        public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> expression) 
+        public async Task<IEnumerable<T?>> FindAsync(Expression<Func<T, bool>> expression, CancellationToken ct = default) 
         => await _dbSet.Where(expression).ToListAsync();
 
         public async Task AddRangeAsync(IEnumerable<T> entities)
@@ -54,5 +49,13 @@ namespace TiklabChallenge.Infrastructure.Repository
             _dbSet.RemoveRange(entities);
             return Task.CompletedTask;
         }
+
+        public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+        {
+            return await _dbSet.FirstOrDefaultAsync(predicate, ct);
+        }
+
+        public async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+        => await _dbSet.AnyAsync(predicate, ct);
     }
 }

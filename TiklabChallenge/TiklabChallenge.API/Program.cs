@@ -6,7 +6,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text;
-using TiklabChallenge.API.Middleware;
 using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
 using TiklabChallenge.Infrastructure.Data;
@@ -64,6 +63,14 @@ else
 }
 
 builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
+builder.Services.AddScoped<IStudentRepository,StudentRepository>();
+builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
+builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
+builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
+builder.Services.AddScoped<ICourseRepository, CourseRepository>();
+builder.Services.AddScoped<CourseSchedulingService>();
+builder.Services.AddScoped<SubjectManagementService>();
+builder.Services.AddScoped<StudentEnrollmentService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddIdentityCore<ApplicationUser>()
     .AddRoles<IdentityRole>()
@@ -72,7 +79,7 @@ builder.Services.AddIdentityCore<ApplicationUser>()
 builder.Services.AddAuthentication(IdentityConstants.BearerScheme);
 builder.Services.AddAuthorization();
 builder.Services.AddIdentityApiEndpoints<ApplicationUser>();
-builder.Services.AddScoped<AppSeeder, AppSeeder>();
+builder.Services.AddScoped<AppSeeder>();
 builder.Services.AddHostedService<SeedService>();
 
 var app = builder.Build();
@@ -100,10 +107,43 @@ app.MapGet("/_debug/users", async (ApplicationContext db) => new {
     Users = await db.Users.Select(u => new { u.Id, u.UserName, u.Email }).ToListAsync(),
     Roles = await db.Roles.Select(r => r.Name).ToListAsync()
 });
+// New debug endpoints for academic data
+var debugGroup = app.MapGroup("/_debug");
 
+debugGroup.MapGet("/subjects", async (ApplicationContext db) =>
+    await db.Subjects
+        .Select(s => new {
+            s.SubjectCode,
+            s.SubjectName,
+            s.Description,
+            s.DefaultCredits,
+            s.PrerequisiteSubjectCode
+        })
+        .ToListAsync());
+debugGroup.MapGet("/courses", async (ApplicationContext db) =>
+    await db.Courses
+        .Select(c => new {
+            c.CourseCode,
+            c.SubjectCode,
+            c.MaxEnrollment,
+            c.CreatedAt,
+            SubjectName = c.Subject.SubjectName
+        })
+        .ToListAsync());
+debugGroup.MapGet("/schedules", async (ApplicationContext db) =>
+    await db.Schedules
+        .Select(s => new {
+            s.Id,
+            s.RoomId,
+            s.CourseCode,
+            Day = s.DayOfWeek.ToString(),
+            s.StartTime,
+            s.EndTime,
+            CourseName = s.Course.Subject.SubjectName
+        })
+        .ToListAsync());
 var identity = app.MapGroup("");                   
-identity.AddEndpointFilter<AssignStudentRoleFilter>(); 
-identity.MapIdentityApi<ApplicationUser>();
+identity.MapCustomIdentityApi<ApplicationUser>();
 
 app.UseHttpsRedirection();
 
