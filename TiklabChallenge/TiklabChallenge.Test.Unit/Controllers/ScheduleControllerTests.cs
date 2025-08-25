@@ -201,34 +201,37 @@ namespace TiklabChallenge.Test.Unit.Controllers
         {
             // Arrange
             var courseCode = "CS101";
-            var schedules = CreateTestSchedules(2, "Room", courseCode);
+            var schedule = CreateTestSchedule(courseCode: courseCode);
+
+            // Fix: Update the mock to return a single Schedule instead of a list
             _scheduleRepoMock.Setup(repo => repo.GetByCourseCodeAsync(courseCode, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(schedules);
+                .ReturnsAsync(schedule);
 
             // Act
             var result = await _controller.GetSchedulesByCourse(courseCode);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
-            var returnedSchedules = Assert.IsAssignableFrom<IEnumerable<Schedule?>>(okResult.Value);
-            Assert.Equal(schedules.Count, returnedSchedules.Count());
+            var returnedSchedule = Assert.IsType<Schedule>(okResult.Value);
+            Assert.Equal(courseCode, returnedSchedule.CourseCode);
         }
 
         [Fact]
-        public async Task GetSchedulesByCourse_EmptyResult_ReturnsOkWithEmptyCollection()
+        public async Task GetSchedulesByCourse_EmptyResult_ReturnsOkWithNull()
         {
             // Arrange
             var courseCode = "NonexistentCourse";
+
+            // Fix: Update the mock to return null instead of an empty list
             _scheduleRepoMock.Setup(repo => repo.GetByCourseCodeAsync(courseCode, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new List<Schedule?>());
+                .ReturnsAsync((Schedule?)null);
 
             // Act
             var result = await _controller.GetSchedulesByCourse(courseCode);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
-            var returnedSchedules = Assert.IsAssignableFrom<IEnumerable<Schedule?>>(okResult.Value);
-            Assert.Empty(returnedSchedules);
+            Assert.Null(okResult.Value);
         }
 
         #endregion

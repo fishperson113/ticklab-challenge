@@ -127,7 +127,6 @@ namespace TiklabChallenge.UseCases.Services
             if (course.MaxEnrollment.HasValue && currentEnrollmentCount >= course.MaxEnrollment.Value)
                 throw new Exception($"Course '{courseCode}' has reached maximum enrollment capacity.");
         }
-
         private async Task ValidatePrerequisitesAsync(
             string studentId,
             string subjectCode,
@@ -140,19 +139,19 @@ namespace TiklabChallenge.UseCases.Services
             if (string.IsNullOrEmpty(subject.PrerequisiteSubjectCode))
                 return; // No prerequisites needed
 
-            var (isValid, errorMessage) = await _subjectService.CanTakeSubjectAsync(studentId, subjectCode, ct);
-            if (!isValid)
-                throw new Exception(errorMessage ?? $"Prerequisite requirements not met for subject '{subjectCode}'.");
-        }
+            var hasCompletedPrereq = await CheckPrerequisiteCompletionAsync(studentId, subject.PrerequisiteSubjectCode, ct);
 
+            if (!hasCompletedPrereq)
+                throw new Exception($"Student must complete {subject.PrerequisiteSubjectCode} before taking {subjectCode}");
+        }
         private async Task ValidateScheduleConflictsAsync(
             string studentId,
             string courseCode,
             CancellationToken ct = default)
         {
-            var schedules = await _uow.Schedules.GetByCourseCodeAsync(courseCode, ct);
-            if (!schedules.Any())
-                return; // No schedules, no conflicts
+            var newSchedule = await _uow.Schedules.GetByCourseCodeAsync(courseCode, ct);
+            if (newSchedule == null)
+                return; // No schedule to check conflicts with
 
             var enrollments = await _uow.Enrollments.GetByStudentAsync(studentId, ct);
             var enrolledCourseCodes = enrollments
@@ -162,29 +161,17 @@ namespace TiklabChallenge.UseCases.Services
 
             foreach (var enrolledCourseCode in enrolledCourseCodes)
             {
-                if (enrolledCourseCode == null)
+                var existingSchedule = await _uow.Schedules.GetByCourseCodeAsync(enrolledCourseCode, ct);
+
+                if (existingSchedule == null)
                     continue;
 
-                var enrolledSchedules = await _uow.Schedules.GetByCourseCodeAsync(enrolledCourseCode, ct);
-
-                foreach (var newSchedule in schedules)
+                // Check for schedule conflict
+                if (HasTimeConflict(existingSchedule, newSchedule))
                 {
-                    if (newSchedule == null)
-                        continue;
-
-                    foreach (var existingSchedule in enrolledSchedules)
-                    {
-                        if (existingSchedule == null)
-                            continue;
-
-                        // Check for schedule conflict
-                        if (HasTimeConflict(existingSchedule, newSchedule))
-                        {
-                            throw new Exception(
-                                $"Schedule conflict with course '{enrolledCourseCode}' on {existingSchedule.DayOfWeek} " +
-                                $"from {existingSchedule.StartTime.ToString("HH:mm")} to {existingSchedule.EndTime.ToString("HH:mm")}.");
-                        }
-                    }
+                    throw new Exception(
+                        $"Schedule conflict with course '{enrolledCourseCode}' on {existingSchedule.DayOfWeek} " +
+                        $"from {existingSchedule.StartTime.ToString("HH:mm")} to {existingSchedule.EndTime.ToString("HH:mm")}.");
                 }
             }
         }
@@ -198,6 +185,17 @@ namespace TiklabChallenge.UseCases.Services
             // Check if time ranges overlap
             return (schedule1.StartTime <= schedule2.StartTime && schedule1.EndTime > schedule2.StartTime) ||
                    (schedule1.StartTime >= schedule2.StartTime && schedule1.StartTime < schedule2.EndTime);
+        }
+        private async Task<bool> CheckPrerequisiteCompletionAsync(
+            string studentId, string prerequisiteCode, CancellationToken ct = default)
+        {
+            var enrollments = await _uow.Enrollments.FindAsync(
+                e => e.StudentId == studentId &&
+                        e.Course.SubjectCode == prerequisiteCode &&
+                        e.IsPassed,
+                ct);
+
+            return enrollments.Any();
         }
     }
 }

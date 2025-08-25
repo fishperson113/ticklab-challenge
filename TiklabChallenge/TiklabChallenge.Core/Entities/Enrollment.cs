@@ -15,5 +15,8 @@ namespace TiklabChallenge.Core.Entities
         public DateTime EnrolledAt { get; set; }
         public required Student Student { get; set; }
         public required Course Course { get; set; }
+        public bool IsPassed { get; set; }
+        public Waitlist? Waitlist { get; set; }
+
     }
 }

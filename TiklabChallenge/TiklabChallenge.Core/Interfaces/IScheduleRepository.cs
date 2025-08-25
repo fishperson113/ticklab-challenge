@@ -11,7 +11,7 @@ namespace TiklabChallenge.Core.Interfaces
     {
         Task<Schedule?> GetByIdWithDetailsAsync(string id, CancellationToken ct = default);
         Task<IEnumerable<Schedule?>> GetByRoomIdAsync(string roomId, CancellationToken ct = default);
-        Task<IEnumerable<Schedule?>> GetByCourseCodeAsync(string courseCode, CancellationToken ct = default);
+        Task<Schedule?> GetByCourseCodeAsync(string courseCode, CancellationToken ct = default);
         Task<IEnumerable<Schedule?>> GetByDayOfWeekAsync(DayOfWeekCode dayOfWeek, CancellationToken ct = default);
         Task UpdateScalarsAsync(string scheduleId, string roomId, DayOfWeekCode dayOfWeek,TimeOnly startTime,TimeOnly endTime,
             CancellationToken ct = default);

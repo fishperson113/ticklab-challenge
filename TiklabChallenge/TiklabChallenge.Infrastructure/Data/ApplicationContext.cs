@@ -23,6 +23,8 @@ namespace TiklabChallenge.Infrastructure.Data
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<Schedule> Schedules { get; set; }
         public DbSet<Subject> Subjects { get; set; }
+        public DbSet<Waitlist> Waitlists { get; set; }
+
 
         #endregion
 
@@ -127,6 +129,26 @@ namespace TiklabChallenge.Infrastructure.Data
                 e.HasKey(x => x.Id);
                 e.Property(x => x.Summary).HasMaxLength(128);
                 e.Property(x => x.Date).HasColumnType("date");
+            });
+            #endregion
+
+            #region Waitlist Entity
+            modelBuilder.Entity<Waitlist>(e =>
+            {
+                e.HasKey(x => new { x.CourseCode, x.StudentId });
+
+                e.Property(x => x.CourseCode).IsRequired().HasMaxLength(32);
+                e.Property(x => x.StudentId).IsRequired();
+
+                e.Property(x => x.CreatedAt)
+                 .HasDefaultValueSql("now()"); // Postgres
+
+                e.HasOne(x => x.Enrollment)
+                 .WithOne(enr => enr.Waitlist)
+                 .HasForeignKey<Waitlist>(x => new { x.StudentId, x.CourseCode })
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(x => new { x.CourseCode, x.CreatedAt, x.StudentId });
             });
             #endregion
         }

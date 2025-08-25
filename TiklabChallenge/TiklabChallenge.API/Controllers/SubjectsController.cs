@@ -113,26 +113,5 @@ namespace TiklabChallenge.API.Controllers
                 return StatusCode(500, "An error occurred while updating the subject.");
             }
         }
-
-        [HttpGet("validate")]
-        [Authorize]
-        public async Task<IActionResult> ValidateSubjectsForEnrollment(
-            [FromQuery] string studentId,
-            [FromQuery] string[] subjectCodes,
-            CancellationToken ct = default)
-        {
-            try
-            {
-                var results = await _subjectService.ValidateSubjectsForStudentAsync(
-                    studentId, subjectCodes, ct);
-
-                return Ok(results);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error validating subjects for enrollment");
-                return StatusCode(500, "An error occurred while validating subjects.");
-            }
-        }
     }
 }
