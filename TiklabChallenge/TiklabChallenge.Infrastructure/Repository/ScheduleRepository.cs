@@ -30,9 +30,9 @@ namespace TiklabChallenge.Infrastructure.Repository
             return await FindAsync(s => s.RoomId == roomId, ct);
         }
 
-        public async Task<IEnumerable<Schedule?>> GetByCourseCodeAsync(string courseCode, CancellationToken ct = default)
+        public async Task<Schedule?> GetByCourseCodeAsync(string courseCode, CancellationToken ct = default)
         {
-            return await FindAsync(s => s.CourseCode == courseCode, ct);
+            return await FirstOrDefaultAsync(s => s.CourseCode == courseCode, ct);
         }
 
         public async Task<IEnumerable< Schedule?>> GetByDayOfWeekAsync(DayOfWeekCode dayOfWeek, CancellationToken ct = default)

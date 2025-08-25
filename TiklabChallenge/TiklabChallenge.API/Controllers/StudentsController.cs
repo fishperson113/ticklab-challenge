@@ -113,5 +113,26 @@ namespace TiklabChallenge.API.Controllers
                 return BadRequest(ex.Message);
             }
         }
+        [HttpDelete("enrollments/{courseCode}")]
+        public async Task<IActionResult> WithdrawFromCourse(string courseCode, CancellationToken ct = default)
+        {
+            try
+            {
+                var user = await _userManager.GetUserAsync(User);
+                if (user is null)
+                    return Unauthorized("Cannot determine current user.");
+
+                await _enrollmentService.WithdrawFromCourseAsync(user.Id, courseCode, ct);
+
+                _logger.LogInformation("Student {StudentId} withdrew from course {CourseCode}", user.Id, courseCode);
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Withdrawal failed: {Message}", ex.Message);
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

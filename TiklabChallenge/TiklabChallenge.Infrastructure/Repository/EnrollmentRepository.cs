@@ -18,8 +18,7 @@ namespace TiklabChallenge.Infrastructure.Repository
 
         public async Task<int> CountEnrolledAsync(string courseCode, CancellationToken ct = default)
         {
-            return await _context.Enrollments
-                .CountAsync<Enrollment>(e => e.CourseCode == courseCode && e.Status == EnrollmentStatus.Enrolled, ct);
+            return await _dbSet.CountAsync<Enrollment>(e => e.CourseCode == courseCode && e.Status == EnrollmentStatus.Enrolled, ct);
         }
 
         public async Task<bool> ExistsAsync(string studentId, string courseCode, CancellationToken ct = default)

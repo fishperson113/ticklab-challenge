@@ -96,37 +96,7 @@ namespace TiklabChallenge.UseCases.Services
             // Get the updated subject
             return await _uow.Subjects.GetBySubjectCodeAsync(subjectCode, ct);
         }
-        // Check if a student can take a subject based on prerequisites
-        public async Task<(bool IsValid, string? ErrorMessage)> CanTakeSubjectAsync(
-            string studentId, string subjectCode, CancellationToken ct = default)
-        {
-            // Get the subject
-            var subject = await _uow.Subjects.GetBySubjectCodeAsync(subjectCode, ct);
-            if (subject == null)
-                return (false, $"Subject '{subjectCode}' not found.");
 
-            // If no prerequisites, student can take it
-            if (string.IsNullOrEmpty(subject.PrerequisiteSubjectCode))
-                return (true, null);
-
-            // Check if student has completed the prerequisite
-            var hasCompletedPrereq = await CheckPrerequisiteCompletionAsync(studentId, subject.PrerequisiteSubjectCode, ct);
-
-            return hasCompletedPrereq
-                ? (true, null)
-                : (false, $"Student must complete {subject.PrerequisiteSubjectCode} before taking {subjectCode}");
-        }
-
-        private async Task<bool> CheckPrerequisiteCompletionAsync(
-            string studentId, string prerequisiteCode, CancellationToken ct = default)
-        {
-            // Get all enrollments for the student
-            var enrollments = await _uow.Enrollments.GetByStudentAsync(studentId, ct);
-
-            return enrollments.Any(e =>
-                e?.CourseCode.StartsWith(prerequisiteCode) == true &&
-                (e?.Status == EnrollmentStatus.Enrolled));
-        }
         public async Task<(bool IsValid, string? ErrorMessage)> ValidatePrerequisiteAsync(
             string subjectCode, string? prerequisiteCode, CancellationToken ct = default)
         {
@@ -212,29 +182,6 @@ namespace TiklabChallenge.UseCases.Services
                 chain.Add(prereq);
                 await BuildPrerequisiteChainAsync(prereq.SubjectCode, chain, visited, ct);
             }
-        }
-
-        public async Task<Dictionary<string, string?>> ValidateSubjectsForStudentAsync(
-            string studentId,
-            IEnumerable<string> subjectCodes,
-            CancellationToken ct = default)
-        {
-            var results = new Dictionary<string, string?>();
-
-            foreach (var subjectCode in subjectCodes)
-            {
-                var (isValid, errorMessage) = await CanTakeSubjectAsync(studentId, subjectCode, ct);
-                if (!isValid)
-                {
-                    results[subjectCode] = errorMessage;
-                }
-                else
-                {
-                    results[subjectCode] = null;  // null means no error
-                }
-            }
-
-            return results;
         }
     }
 }

@@ -68,6 +68,7 @@ builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
 builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
 builder.Services.AddScoped<ICourseRepository, CourseRepository>();
+builder.Services.AddScoped<IWaitlistRepository, WaitlistRepository>();
 builder.Services.AddScoped<CourseSchedulingService>();
 builder.Services.AddScoped<SubjectManagementService>();
 builder.Services.AddScoped<StudentEnrollmentService>();

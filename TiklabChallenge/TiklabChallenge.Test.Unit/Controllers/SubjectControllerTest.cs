@@ -412,44 +412,5 @@ namespace TiklabChallenge.Test.Unit.Controllers
 
         #endregion
 
-        #region ValidateSubjectsForEnrollment Tests
-
-        [Fact]
-        public async Task ValidateSubjectsForEnrollment_ValidRequest_ReturnsOkWithResults()
-        {
-            // Arrange
-            var studentId = "student1";
-            var subjectCodes = new[] { "MATH101", "CS101" };
-            var validationResults = new Dictionary<string, string?>
-            {
-                { "MATH101", null }, // null means no error
-                { "CS101", "Student must complete MATH101 before taking CS101" }
-            };
-            var math101 = CreateTestSubject("MATH101");
-            var cs101 = CreateTestSubject("CS101", prerequisiteSubjectCode: "MATH101");
-
-            _subjectRepoMock.Setup(repo => repo.GetBySubjectCodeAsync("MATH101", It.IsAny<CancellationToken>()))
-                .ReturnsAsync(math101);
-            _subjectRepoMock.Setup(repo => repo.GetBySubjectCodeAsync("CS101", It.IsAny<CancellationToken>()))
-                .ReturnsAsync(cs101);
-
-            var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
-            _mockUow.Setup(uow => uow.Enrollments).Returns(mockEnrollmentRepo.Object);
-
-            mockEnrollmentRepo.Setup(repo => repo.GetByStudentAsync(studentId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new List<Enrollment?>());
-
-            // Act
-            var result = await _controller.ValidateSubjectsForEnrollment(studentId, subjectCodes);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            var returnedResults = Assert.IsType<Dictionary<string, string?>>(okResult.Value);
-            Assert.Equal(2, returnedResults.Count);
-            Assert.Null(returnedResults["MATH101"]);
-            Assert.Contains("must complete", returnedResults["CS101"]);
-        }
-
-        #endregion
     }
 }

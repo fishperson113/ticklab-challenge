@@ -19,6 +19,8 @@ namespace TiklabChallenge.Infrastructure.UnitOfWork
         public IScheduleRepository Schedules { get; private set; }
         public ISubjectRepository Subjects { get; private set; }
         public IEnrollmentRepository Enrollments { get; private set; }
+        public IWaitlistRepository Waitlists { get; }
+
 
         public UnitOfWork(ApplicationContext context)
         {
@@ -29,6 +31,7 @@ namespace TiklabChallenge.Infrastructure.UnitOfWork
             Enrollments = new EnrollmentRepository(_context);
             Courses = new CourseRepository(_context);
             Subjects = new SubjectRepository(_context);
+            Waitlists = new WaitlistRepository(_context);
         }
 
         public async Task<int> CommitAsync() =>

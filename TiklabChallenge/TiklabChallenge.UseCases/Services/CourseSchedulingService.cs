@@ -68,13 +68,12 @@ namespace TiklabChallenge.UseCases.Services
             // Handle schedule update if provided
             if (req.Schedule != null)
             {
-                // Get existing schedules for this course
-                var existingSchedules = await _uow.Schedules.GetByCourseCodeAsync(req.CourseCode, ct);
-                var existingSchedule = existingSchedules.FirstOrDefault();
+                // Get existing schedule for this course
+                var existingSchedule = await _uow.Schedules.GetByCourseCodeAsync(req.CourseCode, ct);
 
                 if (existingSchedule != null)
                 {
-                    // If the schedule has an ID field, make sure it matches one of the existing schedules
+                    // If the schedule has an ID field, make sure it matches the existing schedule
                     if (!string.IsNullOrEmpty(req.Schedule.Id) && existingSchedule.Id != req.Schedule.Id)
                     {
                         // The provided schedule ID doesn't match the existing one - detach old schedule and attach new one
@@ -95,9 +94,9 @@ namespace TiklabChallenge.UseCases.Services
                     {
                         RoomId = req.Schedule.RoomId,
                         CourseCode = req.CourseCode,
-                        DayOfWeek = req.Schedule.DayOfWeek ?? DayOfWeekCode.Monday, 
-                        StartTime = req.Schedule.StartTime ?? new TimeOnly(8, 0),   
-                        EndTime = req.Schedule.EndTime ?? new TimeOnly(10, 0)       
+                        DayOfWeek = req.Schedule.DayOfWeek ?? DayOfWeekCode.Monday,
+                        StartTime = req.Schedule.StartTime ?? new TimeOnly(8, 0),
+                        EndTime = req.Schedule.EndTime ?? new TimeOnly(10, 0)
                     };
 
                     await CreateScheduleAsync(scheduleCreateRequest, ct);
@@ -109,7 +108,7 @@ namespace TiklabChallenge.UseCases.Services
             await _uow.CommitAsync();
             return course;
         }
-        public async Task AttachScheduleAsync(string courseCode, string scheduleId, CancellationToken ct=default)
+        public async Task AttachScheduleAsync(string courseCode, string scheduleId, CancellationToken ct = default)
         {
             var course = await _uow.Courses.GetByCourseCodeAsync(courseCode, ct);
             if (course == null)
@@ -123,21 +122,18 @@ namespace TiklabChallenge.UseCases.Services
 
             await _uow.CommitAsync();
         }
-        public async Task DetachScheduleAsync(string courseCode, CancellationToken ct=default)
+        public async Task DetachScheduleAsync(string courseCode, CancellationToken ct = default)
         {
-            var schedules = await _uow.Schedules.GetByCourseCodeAsync(courseCode, ct);
+            var schedule = await _uow.Schedules.GetByCourseCodeAsync(courseCode, ct);
 
-            foreach (var schedule in schedules)
+            if (schedule != null)
             {
-                if (schedule != null)
-                {
-                    schedule.CourseCode = null;
-                }
+                schedule.CourseCode = null;
             }
 
             await _uow.CommitAsync();
         }
-        public async Task<Schedule?> UpdateScheduleAsync(ScheduleUpdateRequest req, CancellationToken ct=default)
+        public async Task<Schedule?> UpdateScheduleAsync(ScheduleUpdateRequest req, CancellationToken ct = default)
         {
             var schedule = await _uow.Schedules.GetByIdAsync(req.Id, ct);
 
@@ -205,7 +201,7 @@ namespace TiklabChallenge.UseCases.Services
         {
             return await _uow.Courses.GetBySubjectAsync(subjectCode, ct);
         }
-        public async Task<IEnumerable<Course?>> GetBySubjectAsync (string subjectCode, CancellationToken ct = default)
+        public async Task<IEnumerable<Course?>> GetBySubjectAsync(string subjectCode, CancellationToken ct = default)
         {
             return await _uow.Courses.GetBySubjectAsync(subjectCode, ct);
         }
@@ -224,7 +220,7 @@ namespace TiklabChallenge.UseCases.Services
             return await _uow.Schedules.GetByRoomIdAsync(roomId, ct);
         }
 
-        public async Task<IEnumerable<Schedule?>> GetSchedulesByCourseAsync(string courseCode, CancellationToken ct = default)
+        public async Task<Schedule?> GetSchedulesByCourseAsync(string courseCode, CancellationToken ct = default)
         {
             return await _uow.Schedules.GetByCourseCodeAsync(courseCode, ct);
         }
