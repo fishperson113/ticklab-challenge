@@ -9,6 +9,7 @@ using System.Text;
 using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
 using TiklabChallenge.Infrastructure.Data;
+using TiklabChallenge.Infrastructure.Redis;
 using TiklabChallenge.Infrastructure.Repository;
 using TiklabChallenge.Infrastructure.UnitOfWork;
 using TiklabChallenge.UseCases.Services;
@@ -61,6 +62,11 @@ else
     builder.Services.AddDbContext<ApplicationContext>(options =>
         options.UseNpgsql(connectionString)); 
 }
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.InstanceName = "TiklabChallenge";
+});
 
 builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IStudentRepository,StudentRepository>();
@@ -82,6 +88,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddIdentityApiEndpoints<ApplicationUser>();
 builder.Services.AddScoped<AppSeeder>();
 builder.Services.AddHostedService<SeedService>();
+builder.Services.AddScoped<IRedisCacheService, RedisCacheService>();
 
 var app = builder.Build();
 

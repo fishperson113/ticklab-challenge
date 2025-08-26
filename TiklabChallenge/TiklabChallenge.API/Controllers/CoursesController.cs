@@ -16,17 +16,28 @@ namespace TiklabChallenge.API.Controllers
     {
         private readonly ILogger<CoursesController> _logger;
         private readonly CourseSchedulingService _courseService;
+        private readonly IRedisCacheService _cache;
 
-        public CoursesController(CourseSchedulingService courseService, ILogger<CoursesController> logger)
+        public CoursesController(CourseSchedulingService courseService, ILogger<CoursesController> logger,
+            IRedisCacheService cache)
         {
             _logger = logger;
             _courseService = courseService;
+            _cache = cache;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAllCourses(CancellationToken ct = default)
         {
-            var courses = await _courseService.GetAllCoursesAsync(ct);
+            var courses= _cache.Get<IEnumerable<Course?>>("all_courses");
+            if(courses is not null)
+            {
+                return Ok(courses);
+            }
+            courses = await _courseService.GetAllCoursesAsync(ct);
+
+            _cache.Set("all_courses", courses);
+
             return Ok(courses);
         }
 
