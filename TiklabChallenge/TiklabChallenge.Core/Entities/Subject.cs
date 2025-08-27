@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace TiklabChallenge.Core.Entities
@@ -14,6 +15,7 @@ namespace TiklabChallenge.Core.Entities
         public int DefaultCredits { get; set; }
         public string? PrerequisiteSubjectCode { get; set; }
         public Subject? PrerequisiteSubject { get; set; }
+        [JsonIgnore]
         public ICollection<Subject> RequiredBySubjects { get; set; } = new List<Subject>();
         public ICollection<Course> Courses { get; set; } = new List<Course>();
     }
