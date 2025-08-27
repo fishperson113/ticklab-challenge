@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System;
@@ -29,11 +30,13 @@ namespace TiklabChallenge.Test.Unit.Controllers
             _subjectRepoMock = new Mock<ISubjectRepository>();
             _loggerMock = new Mock<ILogger<SubjectsController>>();
             _validationServiceMock = new SubjectManagementService(_mockUow.Object);
-
+            var userStore = new Mock<IUserStore<ApplicationUser>>();
+            var _userManagerMock = new Mock<UserManager<ApplicationUser>>(
+                userStore.Object, null, null, null, null, null, null, null, null);
             _mockUow.Setup(uow => uow.Subjects).Returns(_subjectRepoMock.Object);
 
             // Create controller with mocked dependencies
-            _controller = new SubjectsController(_loggerMock.Object, _validationServiceMock);
+            _controller = new SubjectsController(_loggerMock.Object, _validationServiceMock,null,_userManagerMock.Object);
         }
 
         #region Helper Methods

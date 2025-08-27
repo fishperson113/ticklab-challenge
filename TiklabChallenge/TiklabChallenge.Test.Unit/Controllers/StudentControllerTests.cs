@@ -220,7 +220,8 @@ namespace TiklabChallenge.Test.Unit.Controllers
             _controller = new StudentsController(
                 _loggerMock.Object,
                 _userManagerMock.Object,
-                _enrollmentServiceMock);
+                _enrollmentServiceMock,
+                 null);
         }
         #region Helper Methods
 

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 using TiklabChallenge.API.Controllers;
 using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
+using TiklabChallenge.Infrastructure.Redis;
 using TiklabChallenge.UseCases.DTOs;
 using TiklabChallenge.UseCases.Services;
 using Xunit;
@@ -28,6 +30,9 @@ namespace TiklabChallenge.Test.Unit.Controllers
             _mockUow = new Mock<IUnitOfWork>();
             _courseRepoMock = new Mock<ICourseRepository>();
             _loggerMock = new Mock<ILogger<CoursesController>>();
+            var userStore = new Mock<IUserStore<ApplicationUser>>();
+            var _userManagerMock = new Mock<UserManager<ApplicationUser>>(
+                userStore.Object, null, null, null, null, null, null, null, null);
 
             _mockUow.Setup(uow => uow.Courses).Returns(_courseRepoMock.Object);
 
@@ -35,7 +40,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             _service = new CourseSchedulingService(_mockUow.Object);
 
             // Create controller with the real service
-            _controller = new CoursesController(_service, _loggerMock.Object);
+            _controller = new CoursesController(_service, _loggerMock.Object,null,_userManagerMock.Object);
         }
 
         // Helper to create test courses

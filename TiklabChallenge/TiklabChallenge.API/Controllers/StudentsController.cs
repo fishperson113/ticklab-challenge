@@ -23,15 +23,18 @@ namespace TiklabChallenge.API.Controllers
         private readonly ILogger<StudentsController> _logger;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly StudentEnrollmentService _enrollmentService;
+        private readonly IRedisCacheService _cache;
 
         public StudentsController(
             ILogger<StudentsController> logger,
             UserManager<ApplicationUser> userManager,
-            StudentEnrollmentService enrollmentService)
+            StudentEnrollmentService enrollmentService,
+            IRedisCacheService cache)
         {
             _logger = logger;
             _userManager = userManager;
             _enrollmentService = enrollmentService;
+            _cache = cache;
         }
 
         [HttpGet("me")]
@@ -39,9 +42,24 @@ namespace TiklabChallenge.API.Controllers
         {
             var user = await _userManager.GetUserAsync(User);
             if (user is null) return Unauthorized("Cannot determine current user.");
+            var cacheKey = $"student_profile_{user.Id}";
+            var studentProfile = _cache?.Get<Student>(cacheKey);
+
+            if (studentProfile is not null)
+            {
+                _logger.LogInformation("Retrieved student profile for {UserId} from cache", user.Id);
+                return Ok(new
+                {
+                    studentProfile.UserId,
+                    studentProfile.StudentCode,
+                    studentProfile.FullName
+                });
+            }
 
             var student = await _enrollmentService.GetStudentProfileAsync(user.Id);
             if (student is null) return NotFound("Student profile not found.");
+
+            _cache?.Set(cacheKey, student);
 
             return Ok(new
             {
@@ -71,6 +89,9 @@ namespace TiklabChallenge.API.Controllers
             }
 
             await _enrollmentService.UpdateStudentProfileAsync(student, ct);
+            _cache?.Remove($"student_profile_{user.Id}");
+
+            _cache?.Remove($"student_enrollments_{user.Id}");
 
             return Ok();
         }
@@ -81,7 +102,18 @@ namespace TiklabChallenge.API.Controllers
             var user = await _userManager.GetUserAsync(User);
             if (user is null) return Unauthorized("Cannot determine current user.");
 
-            var enrollmentDetails = await _enrollmentService.GetEnrollmentDetailsAsync(user.Id, ct);
+            var cacheKey = $"student_enrollments_{user.Id}";
+            var enrollmentDetails = _cache?.Get<IEnumerable<object>>(cacheKey);
+
+            if (enrollmentDetails is not null)
+            {
+                _logger.LogInformation("Retrieved enrollment details for {UserId} from cache", user.Id);
+                return Ok(enrollmentDetails);
+            }
+
+            enrollmentDetails = await _enrollmentService.GetEnrollmentDetailsAsync(user.Id, ct);
+
+            _cache?.Set(cacheKey, enrollmentDetails);
 
             return Ok(enrollmentDetails);
         }
@@ -96,6 +128,10 @@ namespace TiklabChallenge.API.Controllers
                     return Unauthorized("Cannot determine current user.");
 
                 var enrollment = await _enrollmentService.EnrollStudentInCourseAsync(user.Id, request, ct);
+
+                _cache?.Remove($"student_enrollments_{user.Id}");
+                _cache?.Remove($"course_{request.CourseCode}_anonymous");
+                _cache?.Remove("all_courses_anonymous");
 
                 _logger.LogInformation("Student {StudentId} enrolled in course {CourseCode}", user.Id, request.CourseCode);
 
@@ -123,6 +159,10 @@ namespace TiklabChallenge.API.Controllers
                     return Unauthorized("Cannot determine current user.");
 
                 await _enrollmentService.WithdrawFromCourseAsync(user.Id, courseCode, ct);
+
+                _cache?.Remove($"student_enrollments_{user.Id}");
+                _cache?.Remove($"course_{courseCode}_anonymous");
+                _cache?.Remove("all_courses_anonymous");
 
                 _logger.LogInformation("Student {StudentId} withdrew from course {CourseCode}", user.Id, courseCode);
 

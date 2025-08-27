@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System;
@@ -29,11 +30,13 @@ namespace TiklabChallenge.Test.Unit.Controllers
             _mockUow = new Mock<IUnitOfWork>();
             _scheduleRepoMock = new Mock<IScheduleRepository>();
             _loggerMock = new Mock<ILogger<SchedulesController>>();
-
+            var userStore = new Mock<IUserStore<ApplicationUser>>();
+            var _userManagerMock = new Mock<UserManager<ApplicationUser>>(
+                userStore.Object, null, null, null, null, null, null, null, null);
             _mockUow.Setup(uow => uow.Schedules).Returns(_scheduleRepoMock.Object);
             var service= new CourseSchedulingService(_mockUow.Object);
             // Create controller with mocked dependencies
-            _controller = new SchedulesController(service, _loggerMock.Object);
+            _controller = new SchedulesController(service, _loggerMock.Object,null,_userManagerMock.Object);
         }
 
         #region Helper Methods
