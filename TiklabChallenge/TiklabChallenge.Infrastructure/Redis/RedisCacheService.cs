@@ -26,6 +26,12 @@ namespace TiklabChallenge.Infrastructure.Redis
             return JsonSerializer.Deserialize<T>(data);
         }
 
+        public void Remove(string key)
+        {
+            var data= _cache?.GetString(key);
+            if (data is not null)  _cache?.Remove(key);
+        }
+
         public void Set<T>(string key, T value)
         {
             var options = new DistributedCacheEntryOptions()
