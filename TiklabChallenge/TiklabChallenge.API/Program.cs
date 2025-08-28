@@ -4,6 +4,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Npgsql;
+using OpenTelemetry;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using System.Reflection;
 using System.Text;
 using TiklabChallenge.Core.Entities;
@@ -13,6 +19,7 @@ using TiklabChallenge.Infrastructure.Redis;
 using TiklabChallenge.Infrastructure.Repository;
 using TiklabChallenge.Infrastructure.UnitOfWork;
 using TiklabChallenge.UseCases.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -89,6 +96,26 @@ builder.Services.AddIdentityApiEndpoints<ApplicationUser>();
 builder.Services.AddScoped<AppSeeder>();
 builder.Services.AddHostedService<SeedService>();
 builder.Services.AddScoped<IRedisCacheService, RedisCacheService>();
+
+builder.Logging.AddOpenTelemetry(options =>
+{
+    options.IncludeScopes = true;
+    options.IncludeFormattedMessage = true;
+});
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("tiklabchallenge-api"))
+    .WithMetrics(m=> m
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddNpgsqlInstrumentation())
+    .WithTracing(t => t
+        .AddHttpClientInstrumentation()
+        .AddAspNetCoreInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddNpgsql()
+        .AddSource())
+    .UseOtlpExporter();
 
 var app = builder.Build();
 
