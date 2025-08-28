@@ -19,8 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TiklabChallenge.API\TiklabChallenge.API.csproj" />
-    <ProjectReference Include="..\TiklabChallenge.UseCases\TiklabChallenge.UseCases.csproj" />
+    <ProjectReference Include="..\..\src\TiklabChallenge.API\TiklabChallenge.API.csproj" />
+    <ProjectReference Include="..\..\src\TiklabChallenge.UseCases\TiklabChallenge.UseCases.csproj" />
   </ItemGroup>
 
   <ItemGroup>
