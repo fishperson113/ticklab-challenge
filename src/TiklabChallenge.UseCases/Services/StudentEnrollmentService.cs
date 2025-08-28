@@ -183,7 +183,7 @@ namespace TiklabChallenge.UseCases.Services
             var enrollments = await _uow.Enrollments.FindAsync(
                 e => e.StudentId == studentId &&
                         e.Course.SubjectCode == prerequisiteCode &&
-                        e.IsPassed,
+                       (e.IsPassed || e.Status == EnrollmentStatus.Enrolled),
                 ct);
 
             return enrollments.Any();
