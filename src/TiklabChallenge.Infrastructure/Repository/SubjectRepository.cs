@@ -46,7 +46,7 @@ namespace TiklabChallenge.Infrastructure.Repository
             string? prerequisiteSubjectCode,
             CancellationToken ct = default)
         {
-            var existingSubject = await FirstOrDefaultAsync(s => s.SubjectCode == subjectCode, ct);
+            var existingSubject = await FirstOrDefaultTrackedAsync(s => s.SubjectCode == subjectCode, ct);
             if (existingSubject == null)
                 throw new KeyNotFoundException($"Subject '{subjectCode}' not found.");
 

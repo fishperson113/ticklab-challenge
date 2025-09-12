@@ -40,7 +40,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             _service = new CourseSchedulingService(_mockUow.Object);
 
             // Create controller with the real service
-            _controller = new CoursesController(_service, _loggerMock.Object,null,_userManagerMock.Object);
+            _controller = new CoursesController(_service, _loggerMock.Object,null,_userManagerMock.Object,null);
         }
 
         // Helper to create test courses

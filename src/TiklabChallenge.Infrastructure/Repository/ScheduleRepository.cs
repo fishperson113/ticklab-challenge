@@ -43,7 +43,7 @@ namespace TiklabChallenge.Infrastructure.Repository
         public async Task UpdateScalarsAsync(string scheduleId, string roomId,
             DayOfWeekCode dayOfWeek, TimeOnly startTime, TimeOnly endTime, CancellationToken ct = default)
         {
-            var existingSchedule = await FirstOrDefaultAsync(s => s.Id == scheduleId, ct);
+            var existingSchedule = await FirstOrDefaultTrackedAsync(s => s.Id == scheduleId, ct);
             if (existingSchedule == null)
                 throw new KeyNotFoundException($"Schedule with ID '{scheduleId}' not found.");
 

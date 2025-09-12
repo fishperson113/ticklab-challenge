@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -10,8 +11,10 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using StackExchange.Redis;
 using System.Reflection;
 using System.Text;
+using System.Threading.RateLimiting;
 using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
 using TiklabChallenge.Infrastructure.Data;
@@ -19,10 +22,11 @@ using TiklabChallenge.Infrastructure.Redis;
 using TiklabChallenge.Infrastructure.Repository;
 using TiklabChallenge.Infrastructure.UnitOfWork;
 using TiklabChallenge.UseCases.Services;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
+ThreadPool.SetMinThreads(200, 200);
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -74,6 +78,12 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.Configuration = builder.Configuration.GetConnectionString("Redis");
     options.InstanceName = "TiklabChallenge";
 });
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var redisConfig = ConfigurationOptions.Parse(configuration.GetConnectionString("Redis"));
+    return ConnectionMultiplexer.Connect(redisConfig);
+});
 
 builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IStudentRepository,StudentRepository>();
@@ -86,6 +96,9 @@ builder.Services.AddScoped<CourseSchedulingService>();
 builder.Services.AddScoped<SubjectManagementService>();
 builder.Services.AddScoped<StudentEnrollmentService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IJobEnqueuerService, JobEnqueuerService>();
+builder.Services.AddScoped<IJobProcessor, JobProcessor>();
+builder.Services.AddHostedService<JobDequeuerService>();
 builder.Services.AddIdentityCore<ApplicationUser>()
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationContext>();
@@ -103,12 +116,17 @@ builder.Logging.AddOpenTelemetry(options =>
     options.IncludeFormattedMessage = true;
 });
 
+
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(r => r.AddService("tiklabchallenge-api"))
     .WithMetrics(m=> m
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
-        .AddNpgsqlInstrumentation())
+        .AddNpgsqlInstrumentation()
+        .AddProcessInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddMeter("TiklabChallenge.Business")
+        .AddPrometheusExporter())
     .WithTracing(t => t
         .AddHttpClientInstrumentation()
         .AddAspNetCoreInstrumentation()
@@ -117,6 +135,16 @@ builder.Services.AddOpenTelemetry()
         .AddSource())
     .UseOtlpExporter();
 
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true; // nén cả HTTPS
+});
+builder.Services.AddSingleton<BusinessMetricsService>();
+
+builder.Services.Configure<PasswordHasherOptions>(options =>
+{
+    options.IterationCount = 5000; // Consider 5000 for testing
+});
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -177,11 +205,27 @@ debugGroup.MapGet("/schedules", async (ApplicationContext db) =>
             CourseName = s.Course.Subject.SubjectName
         })
         .ToListAsync());
+debugGroup.MapGet("/export-users", async (AppSeeder seeder, CancellationToken ct) =>
+{
+    try
+    {
+        string filePath = "exported_users.csv";
+        await seeder.ExportAllUsersToCsvAsync(filePath, ct);
+
+        // Return file for download
+        var bytes = await File.ReadAllBytesAsync(filePath, ct);
+        return Results.File(bytes, "text/csv", "users.csv");
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+app.UseResponseCompression();
 var identity = app.MapGroup("");                   
 identity.MapCustomIdentityApi<ApplicationUser>();
-
-app.UseHttpsRedirection();
-
+app.MapPrometheusScrapingEndpoint();
+//app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 

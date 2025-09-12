@@ -29,7 +29,7 @@ namespace TiklabChallenge.Infrastructure.Repository
 
         public async Task UpdateScalarsAsync(string courseCode, int? maxEnrollment, string subjectCode, CancellationToken ct = default)
         {
-            var existingCourse = await FirstOrDefaultAsync(c => c.CourseCode == courseCode, ct);
+            var existingCourse = await FirstOrDefaultTrackedAsync(c => c.CourseCode == courseCode, ct);
             if (existingCourse is null)
                 throw new KeyNotFoundException($"Course '{courseCode}' not found.");
 
