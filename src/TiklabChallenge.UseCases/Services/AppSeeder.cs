@@ -233,10 +233,10 @@ namespace TiklabChallenge.UseCases.Services
 
         public async Task SeedAllAsync(CancellationToken ct)
         {
-            //await SeedRolesAsync(ct);
-            //await SeedAdminAsync(ct);
-            //await SeedLargeDatasetAsync(ct);
-            //await SeedLargeUserSetAsync(ct);
+            await SeedRolesAsync(ct);
+            await SeedAdminAsync(ct);
+            await SeedLargeDatasetAsync(ct);
+            await SeedLargeUserSetAsync(ct);
             await Task.CompletedTask;
         }
 
