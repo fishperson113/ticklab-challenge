@@ -13,8 +13,8 @@ namespace TiklabChallenge.Core.Entities
         public required string CourseCode { get; set; }
         public EnrollmentStatus Status { get; set; }
         public DateTime EnrolledAt { get; set; }
-        public required Student Student { get; set; }
-        public required Course Course { get; set; }
+        public Student? Student { get; set; }
+        public Course? Course { get; set; }
         public bool IsPassed { get; set; }
         public Waitlist? Waitlist { get; set; }
 

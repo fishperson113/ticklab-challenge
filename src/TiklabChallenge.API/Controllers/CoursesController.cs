@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Diagnostics;
 using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Interfaces;
 using TiklabChallenge.Core.Shared;
@@ -19,29 +21,33 @@ namespace TiklabChallenge.API.Controllers
         private readonly CourseSchedulingService _courseService;
         private readonly IRedisCacheService _cache;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly BusinessMetricsService _metricsService;
 
         public CoursesController(CourseSchedulingService courseService, ILogger<CoursesController> logger,
-            IRedisCacheService cache, UserManager<ApplicationUser> userManager)
+            IRedisCacheService cache, UserManager<ApplicationUser> userManager
+            , BusinessMetricsService metricsService)
         {
             _logger = logger;
             _courseService = courseService;
             _cache = cache;
             _userManager = userManager;
+            _metricsService = metricsService;
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAllCourses(CancellationToken ct = default)
         {
-            var user = await _userManager.GetUserAsync(User);
-            var cachingKey = user != null ? $"all_courses_{user.Id}" : "all_courses_anonymous";
-            var courses = _cache?.Get<IEnumerable<Course?>>(cachingKey);
-            if(courses is not null)
+            var cachingKey = "all_courses";
+            var courses = await _cache.GetAsync<IEnumerable<Course?>>(cachingKey, 150, ct);
+
+            if (courses is not null)
             {
                 _logger.LogInformation("Retrieved all courses from cache");
                 return Ok(courses);
             }
-            courses = await _courseService.GetAllCoursesAsync(ct);
 
+            courses = await _courseService.GetAllCoursesAsync(ct);
             _cache?.Set(cachingKey, courses);
 
             return Ok(courses);
@@ -50,8 +56,8 @@ namespace TiklabChallenge.API.Controllers
         [HttpGet("{courseCode}")]
         public async Task<IActionResult> GetCourse(string courseCode, CancellationToken ct = default)
         {
-            var user = await _userManager.GetUserAsync(User);
-            var cacheKey = user != null ? $"course_{courseCode}_{user.Id}" : $"course_{courseCode}_anonymous";
+            var userId = _userManager.GetUserId(User);
+            var cacheKey = userId != null ? $"course_{courseCode}_{userId}" : $"course_{courseCode}_anonymous";
             var course = _cache?.Get<Course?>(cacheKey);
             if (course is not null)
             {
@@ -73,8 +79,8 @@ namespace TiklabChallenge.API.Controllers
         [HttpGet("subject/{subjectCode}")]
         public async Task<IActionResult> GetCoursesBySubject(string subjectCode, CancellationToken ct = default)
         {
-            var user = await _userManager.GetUserAsync(User);
-            var cacheKey = user != null ? $"subject_courses_{subjectCode}_{user.Id}" : $"subject_courses_{subjectCode}_anonymous";
+            var userId = _userManager.GetUserId(User);
+            var cacheKey = userId != null ? $"subject_courses_{subjectCode}_{userId}" : $"subject_courses_{subjectCode}_anonymous";
 
             var courses = _cache?.Get<IEnumerable<Course?>>(cacheKey);
             if (courses is not null)

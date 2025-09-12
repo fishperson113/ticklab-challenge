@@ -28,7 +28,12 @@ namespace TiklabChallenge.Infrastructure.Repository
 
         public async Task<IEnumerable<Enrollment?>> FindAsync(string studentId, string courseCode, CancellationToken ct = default)
         {
-            return await FindAsync(e => e.StudentId == studentId && e.CourseCode == courseCode, ct);
+            return await _dbSet
+                .Include(e => e.Student)
+                .Include(e => e.Course)
+                .AsNoTracking()
+                .Where(e => e.StudentId == studentId && e.CourseCode == courseCode)
+                .ToListAsync(ct);
         }
 
         public async Task<Enrollment?> FirstOrDefaultAsync(string studentId, string courseCode, CancellationToken ct = default)

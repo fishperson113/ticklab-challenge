@@ -39,6 +39,18 @@ namespace TiklabChallenge.API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, $"Error seeding database: {ex.Message}");
             }
         }
-
+        [HttpPost("reset-enrollments")]
+        public async Task<IActionResult> ResetEnrollments(CancellationToken ct)
+        {
+            try
+            {
+                await _seeder.ResetEnrollmentsAsync(ct);
+                return Ok("Enrollment records reset successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error resetting enrollment records: {ex.Message}");
+            }
+        }
     }
 }

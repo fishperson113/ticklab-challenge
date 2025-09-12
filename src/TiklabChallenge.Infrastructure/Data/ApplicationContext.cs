@@ -33,6 +33,13 @@ namespace TiklabChallenge.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
             // Configure entity properties and relationships here
+
+            modelBuilder.Entity<ApplicationUser>()
+                .HasIndex(u => u.NormalizedUserName);
+
+            modelBuilder.Entity<ApplicationUser>()
+                .HasIndex(u => u.NormalizedEmail);
+
             #region Student Entity 
             modelBuilder.Entity<Student>(s =>
             {

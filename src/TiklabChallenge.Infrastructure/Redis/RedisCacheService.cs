@@ -25,6 +25,21 @@ namespace TiklabChallenge.Infrastructure.Redis
 
             return JsonSerializer.Deserialize<T>(data);
         }
+        public async Task<T?> GetAsync<T>(string key, int opTimeoutMs = 150, CancellationToken ct = default)
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromMilliseconds(opTimeoutMs));
+            try
+            {
+                var json = await _cache.GetStringAsync(key, cts.Token); 
+                if (json is null) return default;
+                return JsonSerializer.Deserialize<T>(json);
+            }
+            catch (OperationCanceledException)
+            {
+                return default;
+            }
+        }
 
         public void Remove(string key)
         {
@@ -36,7 +51,7 @@ namespace TiklabChallenge.Infrastructure.Redis
         {
             var options = new DistributedCacheEntryOptions()
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
             };
 
             _cache?.SetString(key, JsonSerializer.Serialize(value), options);

@@ -221,6 +221,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
                 _loggerMock.Object,
                 _userManagerMock.Object,
                 _enrollmentServiceMock,
+                 null,
                  null);
         }
         #region Helper Methods
@@ -236,7 +237,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             {
                 UserId = user.Id,
                 User = user,
-                StudentCode = studentCode,
+                StudentCode = studentCode,                  
                 FullName = fullName,
                 EnrolledAt = DateTime.UtcNow.AddDays(-30)
             };
@@ -289,12 +290,13 @@ namespace TiklabChallenge.Test.Unit.Controllers
             };
         }
 
-        // Helper to set up UserManager to return the current user
-        private void SetupUserManagerGetUser(ApplicationUser user)
+        // Helper to set up UserManager to return the user ID
+        private void SetupUserManagerGetUserId(string? userId)
         {
-            _userManagerMock.Setup(um => um.GetUserAsync(It.IsAny<ClaimsPrincipal>()))
-                .ReturnsAsync(user);
+            _userManagerMock.Setup(um => um.GetUserId(It.IsAny<ClaimsPrincipal>()))
+                .Returns(userId);
         }
+
         private void SetupStudentRepoGetUserById(Student student)
         {
             _studentRepoMock.Reset();
@@ -320,7 +322,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var user = CreateTestUser();
             var student = CreateTestStudent(user);
 
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
             SetupStudentRepoGetUserById(student);
 
             // Act
@@ -328,14 +330,13 @@ namespace TiklabChallenge.Test.Unit.Controllers
 
             // Assert
             Assert.IsType<OkObjectResult>(result);
-
         }
 
         [Fact]
         public async Task GetMyProfile_NoUser_ReturnsUnauthorized()
         {
             // Arrange
-            SetupUserManagerGetUser(null); // No user found
+            SetupUserManagerGetUserId(null); // No user ID found
 
             // Act
             var result = await _controller.GetMyProfile();
@@ -353,7 +354,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var user2 = CreateTestUser(id:"user2");
             var student = CreateTestStudent(user2);
 
-            SetupUserManagerGetUser(user1);
+            SetupUserManagerGetUserId(user1.Id);
             SetupStudentRepoGetUserById(student);
 
             // Act
@@ -379,8 +380,9 @@ namespace TiklabChallenge.Test.Unit.Controllers
                 FullName = "Updated Name"
             };
 
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
             SetupStudentRepoGetUserById(student);
+            
             // Act
             var result = await _controller.UpdateMyProfile(updateRequest, CancellationToken.None);
 
@@ -402,7 +404,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
                 FullName = "Updated Name"
             };
 
-            SetupUserManagerGetUser(null); // No user found
+            SetupUserManagerGetUserId(null); // No user ID found
 
             // Act
             var result = await _controller.UpdateMyProfile(updateRequest, CancellationToken.None);
@@ -410,8 +412,6 @@ namespace TiklabChallenge.Test.Unit.Controllers
             // Assert
             var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
             Assert.Contains("Cannot determine current user", unauthorizedResult.Value?.ToString() ?? string.Empty);
-
-         
         }
 
         #endregion
@@ -456,7 +456,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
                 }
             };
 
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
 
             // Act
             var result = await _controller.GetMyEnrollments();
@@ -471,7 +471,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
         public async Task GetMyEnrollments_NoUser_ReturnsUnauthorized()
         {
             // Arrange
-            SetupUserManagerGetUser(null); // No user found
+            SetupUserManagerGetUserId(null); // No user ID found
 
             // Act
             var result = await _controller.GetMyEnrollments();
@@ -493,7 +493,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var request = new CourseEnrollmentRequest { CourseCode = "CS101.1" };
             var enrollment = CreateTestEnrollment(user.Id, request.CourseCode);
 
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
             SetupStudentRepoGetUserById(CreateTestStudent(user)); 
 
             // Act
@@ -510,7 +510,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             // Arrange
             var request = new CourseEnrollmentRequest { CourseCode = "CS101.1" };
 
-            SetupUserManagerGetUser(null); // No user found
+            SetupUserManagerGetUserId(null); // No user ID found
 
             // Act
             var result = await _controller.EnrollInCourse(request);
@@ -527,7 +527,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var user = CreateTestUser();
             var request = new CourseEnrollmentRequest { CourseCode = "CS301.1" }; // At max capacity course
 
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
             SetupStudentRepoGetUserById(CreateTestStudent(user));
 
             // Act
@@ -544,6 +544,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
         }
 
         #endregion
+        
         [Fact]
         public async Task EnrollInCourse_WithCompletedPrerequisites_ReturnsCreatedAtAction()
         {
@@ -553,7 +554,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var request = new CourseEnrollmentRequest { CourseCode = "CS102.1" }; // CS102 requires CS101 as prerequisite
 
             // Setup mocks
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
             SetupStudentRepoGetUserById(student);
 
             // Setup prerequisite course as passed
@@ -595,7 +596,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var request = new CourseEnrollmentRequest { CourseCode = "CS102.1" }; // CS102 requires CS101 as prerequisite
 
             // Setup mocks
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
             SetupStudentRepoGetUserById(student);
 
             // Setup empty prerequisites (student hasn't passed CS101)
@@ -613,6 +614,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
             Assert.Contains("Student must complete CS101 before taking CS102", badRequestResult.Value?.ToString() ?? string.Empty);
         }
+        
         [Fact]
         public async Task EnrollInCourse_WithNoScheduleConflicts_ReturnsCreatedAtAction()
         {
@@ -622,7 +624,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var request = new CourseEnrollmentRequest { CourseCode = "CS202.1" }; // Course with no schedule conflicts
 
             // Setup mocks
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
             SetupStudentRepoGetUserById(student);
 
             // Act
@@ -653,7 +655,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var request = new CourseEnrollmentRequest { CourseCode = "CS201.1" }; // Course with schedule conflict
 
             // Setup mocks
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
             SetupStudentRepoGetUserById(student);
 
             // Act
@@ -663,6 +665,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
             Assert.Contains("Schedule conflict", badRequestResult.Value?.ToString() ?? string.Empty);
         }
+        
         [Fact]
         public async Task WithdrawFromCourse_CourseNotAtCapacity_ReturnsNoContent()
         {
@@ -672,7 +675,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var enrollment = CreateTestEnrollment(user.Id, courseCode);
             enrollment.Status = EnrollmentStatus.Enrolled;
 
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
 
             _enrollmentRepoMock.Setup(repo => repo.FirstOrDefaultAsync(
                 user.Id, courseCode, It.IsAny<CancellationToken>()))
@@ -699,7 +702,7 @@ namespace TiklabChallenge.Test.Unit.Controllers
             var waitlistedEnrollment = CreateTestEnrollment(waitlistedUser.Id, courseCode);
             waitlistedEnrollment.Status = EnrollmentStatus.Waitlisted;
 
-            SetupUserManagerGetUser(user);
+            SetupUserManagerGetUserId(user.Id);
 
             _enrollmentRepoMock.Setup(repo => repo.FirstOrDefaultAsync(
                 user.Id, courseCode, It.IsAny<CancellationToken>()))
@@ -754,7 +757,8 @@ namespace TiklabChallenge.Test.Unit.Controllers
                     Student = validStudent
                 }
             };
-            SetupUserManagerGetUser(user);
+            
+            SetupUserManagerGetUserId(user.Id);
 
             // Setup enrollment repository for the withdrawing user
             _enrollmentRepoMock.Setup(repo => repo.FirstOrDefaultAsync(

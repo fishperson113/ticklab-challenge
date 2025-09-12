@@ -23,6 +23,7 @@ using TiklabChallenge.Core.Entities;
 using TiklabChallenge.Core.Shared;
 using TiklabChallenge.Infrastructure.Data;
 using TiklabChallenge.UseCases.DTOs;
+using TiklabChallenge.UseCases.Services;
 namespace Microsoft.AspNetCore.Routing;
 
 /// <summary>
@@ -51,6 +52,7 @@ public static class CustomIdentityApi
         var bearerTokenOptions = endpoints.ServiceProvider.GetRequiredService<IOptionsMonitor<BearerTokenOptions>>();
         var emailSender = endpoints.ServiceProvider.GetRequiredService<IEmailSender<TUser>>();
         var linkGenerator = endpoints.ServiceProvider.GetRequiredService<LinkGenerator>();
+        var metricsService = endpoints.ServiceProvider.GetRequiredService<BusinessMetricsService>();
 
         // We'll figure out a unique endpoint name based on the final route pattern during endpoint generation.
         string? confirmEmailEndpointName = null;
@@ -147,6 +149,7 @@ public static class CustomIdentityApi
             ([FromBody] LoginRequest login, [FromQuery] bool? useCookies, [FromQuery] bool? useSessionCookies, [FromServices] IServiceProvider sp) =>
         {
             var signInManager = sp.GetRequiredService<SignInManager<TUser>>();
+            metricsService.RecordLoginAttempt();
 
             var useCookieScheme = (useCookies == true) || (useSessionCookies == true);
             var isPersistent = (useCookies == true) && (useSessionCookies != true);
@@ -168,9 +171,11 @@ public static class CustomIdentityApi
 
             if (!result.Succeeded)
             {
+                metricsService.RecordLoginFailure();
                 return TypedResults.Problem(result.ToString(), statusCode: StatusCodes.Status401Unauthorized);
             }
 
+            metricsService.RecordLoginSuccess();
             // The signInManager already produced the needed response in the form of a cookie or bearer token.
             return TypedResults.Empty;
         });

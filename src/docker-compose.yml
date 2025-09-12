@@ -14,9 +14,13 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080;https://+:8081
-      - OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gateway-prod-ap-southeast-1.grafana.net/otlp
-      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-      - OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic MTM1OTQyOTpnbGNfZXlKdklqb2lNVFV4T1RZME1pSXNJbTRpT2lKemRHRmpheTB4TXpVNU5ESTVMVzkwYkhBdGQzSnBkR1V0WjNKaFptRnVZU0lzSW1zaU9pSlFOREpQTURSWFVuVTBNMEl3WlRWdVQwdEZURFU1YW5ZaUxDSnRJanA3SW5JaU9pSndjbTlrTFdGd0xYTnZkWFJvWldGemRDMHhJbjE5
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=tiklabchallenge-api,service.version=1.0.0
+      - OTEL_METRIC_EXPORT_INTERVAL=5000
     networks:
       - productnetwork
     restart: on-failure
@@ -43,7 +47,31 @@ services:
       - productnetwork
     restart: on-failure
 
-networks:
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.3
+    environment: 
+     DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "18888:18888"
+    networks:
+      - productnetwork
+  prometheus:
+    image: prom/prometheus
+    ports: 
+    - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - productnetwork
+
+  grafana:
+    image: grafana/grafana
+    ports: 
+    - "3000:3000"
+    networks:
+      - productnetwork
+
+networks: 
   productnetwork:
 
 volumes:

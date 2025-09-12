@@ -30,10 +30,10 @@ namespace TiklabChallenge.UseCases.Services
             await _uow.CommitAsync();
         }
 
-        public async Task<IEnumerable<object>> GetEnrollmentDetailsAsync(string studentId, CancellationToken ct = default)
+        public async Task<IEnumerable<EnrollmentDetails?>> GetEnrollmentDetailsAsync(string studentId, CancellationToken ct = default)
         {
             var enrollments = await _uow.Enrollments.GetByStudentAsync(studentId, ct);
-            var enrollmentDetails = new List<object>();
+            var enrollmentDetails = new List<EnrollmentDetails>();
 
             foreach (var enrollment in enrollments)
             {
@@ -44,12 +44,12 @@ namespace TiklabChallenge.UseCases.Services
                         ? await _uow.Subjects.GetBySubjectCodeAsync(course.SubjectCode, ct)
                         : null;
 
-                    enrollmentDetails.Add(new
+                    enrollmentDetails.Add(new EnrollmentDetails
                     {
-                        enrollment.StudentId,
-                        enrollment.CourseCode,
-                        enrollment.EnrolledAt,
-                        enrollment.Status,
+                        StudentId = enrollment.StudentId,
+                        CourseCode = enrollment.CourseCode,
+                        EnrolledAt = enrollment.EnrolledAt,
+                        Status = enrollment.Status,
                         SubjectName = subject?.SubjectName,
                         SubjectCode = course?.SubjectCode
                     });
@@ -94,9 +94,7 @@ namespace TiklabChallenge.UseCases.Services
                 StudentId = studentId,
                 CourseCode = request.CourseCode,
                 EnrolledAt = DateTime.UtcNow,
-                Status = isCourseAtMaxCapacity ? EnrollmentStatus.Waitlisted : EnrollmentStatus.Enrolled,
-                Student = student,
-                Course = course
+                Status = isCourseAtMaxCapacity ? EnrollmentStatus.Waitlisted : EnrollmentStatus.Enrolled
             };
 
             await _uow.Enrollments.AddAsync(enrollment);
