@@ -20,6 +20,13 @@ services:
       - OTEL_LOGS_EXPORTER=none
       - OTEL_RESOURCE_ATTRIBUTES=service.name=tiklabchallenge-api,service.version=1.0.0
       - OTEL_METRIC_EXPORT_INTERVAL=5000
+      - Logging__LogLevel__Default=Warning
+      - Logging__LogLevel__Microsoft=Warning
+      - Logging__LogLevel__Microsoft__AspNetCore=Warning
+      - Logging__LogLevel__Microsoft__EntityFrameworkCore=Warning
+      - DOTNET_gcServer=1
+      - DOTNET_ReadyToRun=0
+      - DOTNET_TieredPGO=1
     networks:
       - productnetwork
     restart: on-failure
